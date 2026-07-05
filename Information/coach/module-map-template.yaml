@@ -1,0 +1,75 @@
+project: easy-agent
+version: 0.3.0     # 与 spec v0.3 对齐
+
+modules:
+  - name: agentic_loop
+    label: Agent Loop 核心循环
+    paths: [src/core/agenticLoop.ts, src/core/queryEngine.ts]
+    weight: core
+    tree_root: A       # 决策树根节点 A. Agent Loop / Runtime
+    jd_anchors:
+      - "Agent Loop + Planning + Tool Use + Reasoning"
+      - "上下文管理"
+    tags: [loop, reasoning, planning]
+    default_depth: 5
+
+  - name: tool_use
+    label: Tool Use / Function Calling
+    paths: [src/tools/, src/tools/Tool.ts]
+    weight: core
+    tree_root: B       # 决策树根节点 B. Tool System
+    jd_anchors:
+      - "Tool Use / Function Calling"
+      - "Skills / MCP"
+    tags: [tool, mcp]
+    default_depth: 5
+
+  - name: memory
+    label: Memory System
+    paths: [src/session/, src/context/]
+    weight: core
+    tree_root: C       # 决策树根节点 C. Memory System
+    jd_anchors: ["长期记忆"]
+    tags: [memory]
+    default_depth: 5
+
+  - name: planner
+    label: Planner / Reasoning
+    paths: [src/agents/]
+    weight: core
+    tree_root: D       # 决策树根节点 D. Planner / Reasoning
+    jd_anchors: ["Planning", "Reasoning"]
+    tags: [planner]
+    default_depth: 5
+
+  - name: context_engineering
+    label: Context / Prompt Engineering
+    paths: [src/context/, src/session/fileHistory.ts, src/core/compaction.ts]
+    weight: core
+    tree_root: E       # 决策树根节点 E. Context / Prompt Engineering
+    jd_anchors:
+      - "长期记忆"
+      - "Context Engineering"
+      - "KV Cache"
+    tags: [context]
+    default_depth: 5
+
+  - name: evaluation
+    label: Evaluation / Harness
+    paths: [src/services/, src/scripts/]
+    weight: core
+    tree_root: F       # 决策树根节点 F. Evaluation / Harness
+    jd_anchors: ["评测体系", "数据飞轮"]
+    tags: [eval]
+    default_depth: 5
+
+  # 未映射到 6 大根节点的模块（如 permissions / sandbox / ui）继续写在这里
+  # v3 行为：tree_root 缺省 → 回退到 v0.2 的"4 类轮换"逻辑
+  - name: permissions
+    label: 权限 / 沙箱
+    paths: [src/permissions/, src/sandbox/]
+    weight: important
+    # tree_root: null  # 留空，触发 v0.2 fallback
+    jd_anchors: ["权限控制", "沙箱"]
+    tags: [permissions, security]
+    default_depth: 3

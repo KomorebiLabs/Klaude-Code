@@ -1,0 +1,9 @@
+# interview-coach: per-project ignore rules
+# Copy this file to your project root as `.gitignore` (or merge into existing).
+
+# User state for the interview-coach skill
+progress.md
+Information/coach/state/
+
+# Local-only module-map overrides
+*.local.yaml
