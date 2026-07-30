@@ -10,6 +10,13 @@ This repository is the open-source implementation track of that effort. Full doc
 
 > Chinese version: see [README.zh-CN.md](./README.zh-CN.md)
 
+## Acknowledgements
+This project is inspired by and built upon the excellent work of [ConardLi](https://github.com/ConardLi) and the [easy-agent](https://github.com/ConardLi/easy-agent) project.
+
+The original project provided a valuable foundation for exploring Agent architectures and development practices. This repository continues that exploration by extending, experimenting with, and improving upon the original ideas.
+
+Many thanks to the original author for sharing this work with the open-source community. Please consider supporting the original project.
+
 ## Vision
 
 Easy Agent aims to become a serious open-source recreation of a modern local coding agent system.
