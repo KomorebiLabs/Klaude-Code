@@ -289,6 +289,28 @@ export async function getSessionPaths(cwd: string, sessionId: string): Promise<S
   };
 }
 
+export interface TracePaths {
+  traceDir: string;
+  tracePath: string;
+}
+
+function sanitizeTraceId(traceId: string): string {
+  return traceId.replace(/[^a-zA-Z0-9._-]/g, "_") || "trace";
+}
+
+export async function getTracePaths(cwd: string, traceId: string): Promise<TracePaths> {
+  const { projectDir } = await getSessionPaths(cwd, "placeholder");
+  const traceDir = path.join(projectDir, "traces");
+  return {
+    traceDir,
+    tracePath: path.join(traceDir, `${sanitizeTraceId(traceId)}.jsonl`),
+  };
+}
+
+export async function getTracePath(cwd: string, traceId: string): Promise<string> {
+  return (await getTracePaths(cwd, traceId)).tracePath;
+}
+
 async function ensureSessionDir(paths: SessionPaths): Promise<void> {
   await fs.mkdir(paths.projectDir, { recursive: true });
 }

@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import {
   createSafeMessage,
+  createTraceWriter,
+  getTracePath,
+  readTraceEvents,
   redactForTrace,
   summarizeToolInput,
   summarizeToolResult,
 } from "../observability/index.js";
+import { configureSessionPersistence } from "../session/storage.js";
 
 const secret = "sk-test-very-secret";
 const redacted = redactForTrace({
@@ -71,4 +77,42 @@ assert.equal("command" in summary, false);
 
 assert.equal(createSafeMessage(`Authorization: Bearer abcdef ${"x".repeat(1_000)}`).includes("abcdef"), false);
 assert.ok(createSafeMessage("x".repeat(1_000)).length <= 500);
-console.log("trace DTO/redaction tests passed");
+
+const storageRoot = await fs.mkdtemp(path.join(process.cwd(), ".trace-test-"));
+const traceCwd = path.join(storageRoot, "project");
+await fs.mkdir(traceCwd, { recursive: true });
+const traceId = "trace-test";
+
+configureSessionPersistence(true);
+const tracePath = await getTracePath(traceCwd, traceId);
+await fs.rm(tracePath, { force: true });
+const traversalPath = await getTracePath(traceCwd, "../escape");
+assert.equal(path.dirname(traversalPath), path.dirname(tracePath));
+const writer = await createTraceWriter(traceCwd, traceId);
+writer.emit("query.started", { model: "test-model" });
+writer.emit("query.finished", { outcome: "success" });
+await writer.close();
+assert.equal((await fs.readFile(tracePath, "utf8")).trim().split("\n").length, 2);
+const events = await readTraceEvents(tracePath);
+assert.deepEqual(events.map((event) => event.eventType), ["query.started", "query.finished"]);
+
+await fs.appendFile(tracePath, '{"schemaVersion":1,"eventType":"truncated"\n', "utf8");
+assert.equal((await readTraceEvents(tracePath)).length, 2);
+
+configureSessionPersistence(false);
+const disabledTraceId = "trace-disabled";
+const disabledWriter = await createTraceWriter(traceCwd, disabledTraceId);
+disabledWriter.emit("query.started", {});
+await disabledWriter.close();
+await assert.rejects(fs.access(await getTracePath(traceCwd, disabledTraceId)));
+configureSessionPersistence(true);
+
+const failingCwd = path.join(storageRoot, "failing-project");
+const failingWriter = await createTraceWriter(failingCwd, "trace-failure");
+const failingTracePath = await getTracePath(failingCwd, "trace-failure");
+await fs.rm(path.dirname(failingTracePath), { recursive: true, force: true });
+assert.doesNotThrow(() => failingWriter.emit("query.started", { apiKey: "secret" }));
+await assert.doesNotReject(() => failingWriter.close());
+
+await fs.rm(storageRoot, { recursive: true, force: true });
+console.log("trace DTO/redaction/storage tests passed");
