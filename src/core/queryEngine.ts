@@ -105,6 +105,13 @@ import {
   handleMcpCommand,
 } from "./queryEngine/commands/registry.js";
 import { handleRewindCommand } from "./queryEngine/commands/rewind.js";
+import {
+  createQueryAbortedPayload,
+  createQueryFailedPayload,
+  createQueryFinishedPayload,
+  createQueryStartedPayload,
+  createTraceWriter,
+} from "../observability/index.js";
 
 export class QueryEngine {
   private messages: MessageParam[];
@@ -666,6 +673,18 @@ export class QueryEngine {
 
     const abortController = new AbortController();
     this.abortController = abortController;
+    const traceWriter = await createTraceWriter(this.toolContext.cwd, randomUUID());
+
+    traceWriter.emit(
+      "query.started",
+      createQueryStartedPayload({
+        model: this.getActiveModel(),
+        permissionMode: this.currentPermissionMode,
+        messageCount: this.messages.length,
+        promptLength: promptToSubmit.length,
+        hasUserPrompt: promptToSubmit.length > 0,
+      }),
+    );
 
     try {
       const systemParts = previewSystemParts;
@@ -723,6 +742,14 @@ export class QueryEngine {
             turnUsage: { ...value.usage },
             lastCallUsage: { ...this.lastCallUsage },
           };
+          traceWriter.emit(
+            "query.finished",
+            createQueryFinishedPayload({
+              reason: value.reason,
+              messageCount: this.messages.length,
+              usage: value.usage,
+            }),
+          );
           return { handled: true, reason: value.reason };
         }
 
@@ -738,7 +765,14 @@ export class QueryEngine {
             break;
         }
       }
+    } catch (error) {
+      traceWriter.emit(
+        abortController.signal.aborted ? "query.aborted" : "query.failed",
+        abortController.signal.aborted ? createQueryAbortedPayload() : createQueryFailedPayload(error),
+      );
+      throw error;
     } finally {
+      await traceWriter.close();
       this.abortController = null;
       // Stage 23: drop any per-turn model override so the next prompt
       // reverts to the session/default model.

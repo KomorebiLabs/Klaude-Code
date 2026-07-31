@@ -4,6 +4,10 @@ import * as path from "node:path";
 import {
   createSafeMessage,
   createTraceWriter,
+  createQueryAbortedPayload,
+  createQueryFailedPayload,
+  createQueryFinishedPayload,
+  createQueryStartedPayload,
   getTracePath,
   readTraceEvents,
   redactForTrace,
@@ -77,6 +81,49 @@ assert.equal("command" in summary, false);
 
 assert.equal(createSafeMessage(`Authorization: Bearer abcdef ${"x".repeat(1_000)}`).includes("abcdef"), false);
 assert.ok(createSafeMessage("x".repeat(1_000)).length <= 500);
+
+const startedPayload = createQueryStartedPayload({
+  model: "claude-test",
+  permissionMode: "default",
+  messageCount: 3,
+  promptLength: 42,
+  hasUserPrompt: true,
+});
+assert.deepEqual(startedPayload, {
+  model: "claude-test",
+  permissionMode: "default",
+  messageCount: 3,
+  promptLength: 42,
+  hasUserPrompt: true,
+  contentOmitted: true,
+});
+
+const finishedPayload = createQueryFinishedPayload({
+  reason: "end_turn",
+  messageCount: 4,
+  usage: {
+    input_tokens: 11,
+    output_tokens: 7,
+    cache_creation_input_tokens: 5,
+    cache_read_input_tokens: 3,
+  },
+});
+assert.deepEqual(finishedPayload, {
+  reason: "end_turn",
+  messageCount: 4,
+  inputTokens: 11,
+  outputTokens: 7,
+  cacheCreationInputTokens: 5,
+  cacheReadInputTokens: 3,
+});
+
+const failedPayload = createQueryFailedPayload(new Error("password=hunter2 Authorization: Bearer abcdef"));
+assert.equal(JSON.stringify(failedPayload).includes("hunter2"), false);
+assert.equal(JSON.stringify(failedPayload).includes("abcdef"), false);
+assert.equal(failedPayload.errorCategory, "Error");
+
+const abortedPayload = createQueryAbortedPayload();
+assert.deepEqual(abortedPayload, { reason: "abort_signal" });
 
 const storageRoot = await fs.mkdtemp(path.join(process.cwd(), ".trace-test-"));
 const traceCwd = path.join(storageRoot, "project");
