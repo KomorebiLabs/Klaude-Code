@@ -6,6 +6,10 @@
 
 > **项目身份：** Klaude-Code 不是官方 `easy-agent` 仓库，也不代表原作者的立场。它是在开源基础上独立维护和继续演进的项目，拥有自己的工程路线，重点关注可观测性、可靠性、安全、评估和多 Agent 工作流。
 
+Klaude-Code 探索如何通过 **Agent Harness**，将 Coding Model 转化为可靠、可观测、可扩展的本地开发系统。项目由一名在读本科生独立维护，在实践中持续学习 Agent 工程与开源协作。
+
+如果你发现问题、产生了想法，或希望讨论项目方向，欢迎在 [Issues](https://github.com/KomorebiLabs/Klaude-Code/issues) 中留言。
+
 Klaude-Code 是一个长期演进的 TypeScript / Node.js 本地 Agentic Coding System 项目。仓库保留了原始 Easy Agent 实现路线所建立的功能基础，同时新增独立的企业级 Harness 路线：把已有 Agent 能力逐步变成适合真实编码工作流的、可观测、可恢复、可评估、安全且可维护的系统。
 
 > English version: see [README.md](./README.md)

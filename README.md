@@ -6,6 +6,10 @@ Klaude-Code is an independently maintained extension of [ConardLi/easy-agent](ht
 
 > **Project identity:** Klaude-Code is not the official `easy-agent` repository and does not represent the original author's views. It is an independent continuation built on top of an open-source foundation, with its own engineering roadmap around observability, reliability, safety, evaluation, and multi-agent operation.
 
+Klaude-Code explores how an **Agent Harness** can turn coding models into reliable, observable, and extensible local development systems. It is independently maintained by an undergraduate developer through hands-on engineering and open-source practice.
+
+If you find a problem, have an idea, or would like to discuss the project's direction, feel free to open an [issue](https://github.com/KomorebiLabs/Klaude-Code/issues).
+
 Klaude-Code is a long-horizon TypeScript and Node.js project for building a local agentic coding system. The repository keeps the functional foundation developed through the original Easy Agent implementation path while adding a separate Enterprise Harness track: turning existing agent capabilities into systems that are observable, recoverable, evaluable, secure, and maintainable in real coding workflows.
 
 > Chinese version: see [README.zh-CN.md](./README.zh-CN.md)
