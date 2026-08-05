@@ -1,19 +1,25 @@
 ---
-title: "Easy-Agent 企业级 Harness 升级总控"
-status: active
+title: "P0–P4 企业级 Harness 升级历史总控"
+status: historical-reference
 owner: "YangYiTao + Claude"
-branch: enterprise-harness-upgrade
 created: 2026-07-28
+updated: 2026-08-04
+roadmap_role: historical-priority-plan
+current_public_roadmap: "README.md — Klaude-Code Enterprise Harness Track E0–E9"
 tags:
   - agent-harness
   - engineering-roadmap
   - reliability
   - evaluation
+  - historical-reference
 ---
 
-# Easy-Agent 企业级 Harness 升级总控
+> [!note] 文档角色与当前路线
+> 本文件记录 2026-07-28 制定的早期 P0–P4 优先级设计。随着 Task 1–3 完成和 Klaude-Code 品牌路线形成，当前对外长期路线以根目录 [`README.md`](../../../README.md) 中的 **Klaude-Code Enterprise Harness Track（E0–E9）** 为准；本文件保留为设计演进历史、P0 依据和面试推演材料。
+>
+> 文中保留当时的 Easy-Agent 命名、分支和路径，是历史上下文，不代表当前 worktree 状态。
 
-> [!abstract] 北极星目标
+
 > 在**明确的高频日常 coding 工作流**中，让 Easy-Agent 成为可持续使用的本地终端 Agent，而不是功能演示集合；以可复现任务、可靠性数据、可诊断失败和安全边界逐步逼近 Claude Code / Codex 的 Harness 水准。
 >
 > 这不是“声称完全替代 Claude Code/Codex”的项目。是否能替代，必须由任务成功率、人工接管率、恢复成本与安全行为证据决定。
@@ -24,7 +30,7 @@ tags:
 | --- | --- |
 | 原始工作区 | `main` 已有大量非本阶段的未提交变更；禁止在其中修改或清理。 |
 | 开发分支 | `enterprise-harness-upgrade`。 |
-| 隔离环境 | `.claude/worktrees/enterprise-harness-upgrade`。 |
+| 隔离环境 | `.claude/worktrees/enterprise-harness-upgrade`（历史设计环境；当前实现 worktree 为 `trace-task-3-query-lifecycle`）。 |
 | 上游推送 | 此 worktree 的 `origin` fetch URL 保留原地址，**push URL 已设置为 `DISABLED_NO_PUSH_TO_UPSTREAM`**；禁止绕过它。 |
 | 提交/发布 | 未得到用户明确指令，不提交、不推送、不创建 PR。 |
 | 影响分析 | 修改任何函数、类或方法前，按项目 `CLAUDE.md` 执行 GitNexus upstream impact analysis。 |

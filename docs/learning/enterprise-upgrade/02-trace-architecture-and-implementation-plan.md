@@ -2,8 +2,9 @@
 title: "P0 Trace：架构与实施计划（学习 / 面试推演版）"
 status: draft
 created: 2026-07-28
+updated: 2026-08-04
 tags:
-  - easy-agent
+  - klaude-code
   - agent-harness
   - observability
   - evaluation

@@ -1,8 +1,9 @@
 ---
 title: Task 3 — QueryEngine 顶层生命周期 Trace
 date: 2026-07-31
+updated: 2026-08-04
 tags:
-  - easy-agent
+  - klaude-code
   - dev-doc
   - trace
   - queryengine
@@ -11,6 +12,7 @@ aliases:
   - Task3 生命周期 Trace
   - query-lifecycle-trace
 status: done
+roadmap_phase: E1
 ---
 
 # Task 3：QueryEngine 顶层生命周期 Trace
@@ -20,7 +22,7 @@ status: done
 
 | 元信息 | 值 |
 |--------|-----|
-| 阶段 | Task 3（承接 [[dev-doc-task-2-jsonl-trace-storage\|Task 2]]） |
+| 阶段 | Task 3（承接 [[task-2-jsonl-trace-storage|Task 2]]） |
 | 提交 | `1385998`（功能）→ `91595e1`（merge 进 main） |
 | 分支 | `feature/trace-task-3-query-lifecycle` |
 
@@ -144,11 +146,11 @@ payload 里所有字段名都是显式白名单，任何新增字段必须先过
 
 ## 🔗 相关链接
 
-- 上一阶段：[[dev-doc-task-2-jsonl-trace-storage|Task 2：本地 JSONL Trace 存储]]
+- 上一阶段：[[task-2-jsonl-trace-storage|Task 2：本地 JSONL Trace 存储]]
 - 完整契约定义：
-  - `ADR-001-local-structured-harness-trace.md`
-  - `harness-trace-event-contract.md`
-  - `harness-trace-storage-and-privacy.md`
+  - `../adr/ADR-001-local-structured-harness-trace.md`
+  - `../specs/harness-trace-event-contract.md`
+  - `../specs/harness-trace-storage-and-privacy.md`
 
 ## 🚀 后续展望
 

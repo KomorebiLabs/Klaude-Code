@@ -2,8 +2,9 @@
 title: "从功能集合到企业级 Agent Harness：为什么第一步是 Trace 与 Evaluation"
 status: active-learning-note
 created: 2026-07-28
+updated: 2026-08-04
 tags:
-  - easy-agent
+  - klaude-code
   - agent-harness
   - observability
   - evaluation
@@ -14,10 +15,14 @@ aliases:
 
 # 从功能集合到企业级 Agent Harness：为什么第一步是 Trace 与 Evaluation
 
+> [!note] 当前位置
+> 本文是学习与面试材料，不是运行时规范。项目当前对外长期路线以根目录 README 的 E0–E9 为准；早期 P0–P4 设计见 [[../../engineering/roadmap/p0-p4-upgrade-master-plan|P0–P4 历史总控]]。
+
+
 > [!important] 这一阶段你要建立的能力
 > 不是“给项目加一个日志功能”，而是学会判断：当一个 Agent 项目已经有 Loop、Tools、MCP、Memory、Subagent、Sandbox 后，为什么仍然可能不具备企业级工程能力。
 
-关联：[[../engineering/enterprise-uplift-master-plan|企业级升级总控]]
+关联：[[../../engineering/roadmap/p0-p4-upgrade-master-plan|P0–P4 历史总控]]
 
 ## 1. 项目真正的目标是什么？
 
