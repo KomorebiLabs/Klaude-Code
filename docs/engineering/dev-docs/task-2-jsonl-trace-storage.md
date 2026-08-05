@@ -1,8 +1,9 @@
 ---
 title: Task 2 — 本地 JSONL Trace 存储
 date: 2026-07-30
+updated: 2026-08-04
 tags:
-  - easy-agent
+  - klaude-code
   - dev-doc
   - trace
   - storage
@@ -10,6 +11,7 @@ aliases:
   - Task2 JSONL 存储
   - jsonl-trace-storage
 status: done
+roadmap_phase: E1
 ---
 
 # Task 2：本地 JSONL Trace 存储
@@ -19,7 +21,7 @@ status: done
 
 | 元信息 | 值 |
 |--------|-----|
-| 阶段 | Task 2（承接 [[dev-doc-task-1-trace-contract-foundation\|Task 1]]） |
+| 阶段 | Task 2（承接 [[task-1-trace-contract-foundation|Task 1]]） |
 | 提交 | `6950503`（功能）→ `6932280`（merge 进 main） |
 | 分支 | `feature/trace-task-2-storage` |
 
@@ -149,5 +151,5 @@ flowchart LR
 
 ## 🔗 相关链接
 
-- 上一阶段：[[dev-doc-task-1-trace-contract-foundation|Task 1：Trace 事件契约]]
-- 下一阶段：[[dev-doc-task-3-query-lifecycle-trace|Task 3：QueryEngine 生命周期 Trace]]
+- 上一阶段：[[task-1-trace-contract-foundation|Task 1：Trace 事件契约]]
+- 下一阶段：[[task-3-query-lifecycle-trace|Task 3：QueryEngine 生命周期 Trace]]

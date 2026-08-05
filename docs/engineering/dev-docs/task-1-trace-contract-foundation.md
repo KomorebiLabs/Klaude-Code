@@ -1,8 +1,9 @@
 ---
 title: Task 1 — Trace 事件契约与安全基础
 date: 2026-07-28
+updated: 2026-08-04
 tags:
-  - easy-agent
+  - klaude-code
   - dev-doc
   - trace
   - observability
@@ -10,6 +11,7 @@ aliases:
   - Task1 事件契约
   - trace-contract-foundation
 status: done
+roadmap_phase: E1
 ---
 
 # Task 1：Trace 事件契约与安全基础
@@ -21,7 +23,7 @@ status: done
 |--------|-----|
 | 阶段 | Task 1（P0 起点） |
 | 提交 | `c0011b4`（契约）+ `ca009ce`（脱敏加固） |
-| 分支 | `enterprise-harness-upgrade` 工作树 |
+| 分支 | `feature/trace-task-3-query-lifecycle` worktree（Task 1 的实现最初起于早期 `enterprise-harness-upgrade` 设计分支） |
 
 ---
 
@@ -141,5 +143,5 @@ flowchart TD
 
 ## 🔗 相关链接
 
-- 下一阶段：[[dev-doc-task-2-jsonl-trace-storage|Task 2：本地 JSONL Trace 存储]]
-- 再下一阶段：[[dev-doc-task-3-query-lifecycle-trace|Task 3：QueryEngine 生命周期 Trace]]
+- 下一阶段：[[task-2-jsonl-trace-storage|Task 2：本地 JSONL Trace 存储]]
+- 再下一阶段：[[task-3-query-lifecycle-trace|Task 3：QueryEngine 生命周期 Trace]]

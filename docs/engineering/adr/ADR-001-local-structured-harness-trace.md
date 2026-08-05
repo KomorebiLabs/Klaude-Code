@@ -1,12 +1,14 @@
 ---
 title: ADR-001 本地结构化 Harness Trace
-status: proposed
+status: accepted-partially-implemented
+implementation_status: "Task 1–3 completed; Task 4–6 pending"
 date: 2026-07-28
+updated: 2026-08-04
 deciders:
   - YangYiTao
   - Easy-Agent maintainers
 tags:
-  - easy-agent
+  - klaude-code
   - agent-harness
   - architecture-decision-record
   - observability
@@ -16,9 +18,8 @@ aliases:
 
 # ADR-001：采用本地结构化 Harness Trace 作为可观测性与评测地基
 
-## 状态
-
-**Proposed（仅完成设计，尚未开始运行时代码实施）**。
+> [!success] 当前实现状态
+> 本 ADR 的架构决策已接受并开始实施。Task 1（契约/脱敏）、Task 2（JSONL 存储）和 Task 3（QueryEngine 生命周期 Trace）已完成；模型/重试、工具/权限事件以及 F1–F7 Evaluation 仍是后续任务。
 
 ## Context
 
@@ -31,7 +32,7 @@ Easy-Agent 已具备多轮 Agent Loop、工具调用、权限、MCP、上下文�
 - session transcript 以恢复对话为主要目标，不能替代面向诊断和评测的 trace；
 - 新增 Memory、Multi-Agent 或 Provider 适配前，缺少证明改动有效、不会回归的证据链。
 
-本 ADR 服务于 [[../enterprise-uplift-master-plan|企业级 Harness 升级总控]] 的 P0 阶段。
+本 ADR 服务于 [[../roadmap/p0-p4-upgrade-master-plan|P0–P4 企业级 Harness 升级历史总控]] 的 P0 阶段。
 
 ## Decision
 
