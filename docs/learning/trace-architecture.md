@@ -18,7 +18,7 @@ aliases:
 > [!abstract]
 > 这不是“教你加日志”的笔记。它训练你把一个 Agent Harness 的真实工程问题，讲成**现象 → 边界 → 取舍 → 失败模式 → 验证证据**的链路。
 
-前置阅读：[[01-why-trace-and-evaluation-first|为什么先做 Trace 与 Evaluation]]。设计事实：[[../../engineering/adr/ADR-001-local-structured-harness-trace|ADR-001]]、[[../../engineering/specs/harness-trace-event-contract|事件契约]]、[[../../engineering/specs/harness-trace-storage-and-privacy|隐私规范]]、[[../../engineering/evaluation/trace-mvp-acceptance-plan|验收计划]]。
+前置阅读：[[why-trace-first|为什么先做 Trace 与 Evaluation]]。设计事实：[[../trace-adr-001|ADR-001]]、[[../trace-event-contract|事件契约]]、[[../trace-storage-privacy|隐私规范]]、[[../trace-acceptance|验收计划]]。
 
 ## 1. 先建立你的架构心智模型
 
@@ -200,7 +200,7 @@ create trace → run existing loop → finish trace in all terminal paths
 - [ ] 能画出 QueryEngine → AgenticLoop → Tool 边界的数据流。
 - [ ] 能说出 P0 明确不做的五件事。
 - [ ] 能为 writer failure 设计不影响 Agent 主路径的测试。
-- [ ] 已阅读 [[../../engineering/evaluation/trace-mvp-acceptance-plan|验收计划]]，并能解释 F1–F7 各自防什么回归。
+- [ ] 已阅读 [[../trace-acceptance|验收计划]]，并能解释 F1–F7 各自防什么回归。
 
 ---
 

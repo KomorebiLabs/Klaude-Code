@@ -219,7 +219,21 @@ Task 1–3 已经建立了第一条本地结构化 Trace Slice。E1 的后续工
 - 📋 增加 Trace 检查/导出 CLI 和诊断包格式；
 - 📋 定义 Trace schema 迁移和保留规则。
 
-当前证据：Task 1–3 的契约、存储、隐私和 QueryEngine 生命周期工作见 [`docs/engineering/`](./docs/engineering/)。当前生命周期 payload 不记录 prompt 内容、system prompt、消息正文、工具输入/输出正文、stdout/stderr 或 API key。
+当前证据：Task 1–3 的契约、存储、隐私和 QueryEngine 生命周期工作见 [`docs/`](./docs/)。当前生命周期 payload 不记录 prompt 内容、system prompt、消息正文、工具输入/输出正文、stdout/stderr 或 API key。
+
+### 文档
+
+项目文档保持有意的简洁结构：
+
+```text
+docs/
+├── README.md                         # 唯一文档入口
+├── trace-*.md / task-*.md            # 当前活动工程文档
+├── learning/                         # 学习与面试材料
+└── archive/                          # 历史计划和旧索引
+```
+
+新的活动 Task 和工程文档直接放在 `docs/` 根目录，不再创建额外的 `engineering/`、`adr/`、`specs/`、`evaluation/`、`dev-docs/` 或 `roadmap/` 子目录。只有学习/面试材料放入 `docs/learning/`，历史或已被替代的文档放入 `docs/archive/`。阅读文档请从 [`docs/README.md`](./docs/README.md) 开始。
 
 ### E2 —— 运行时可靠性与恢复加固
 
