@@ -14,6 +14,9 @@ status: active
 
 # Klaude-Code Docs
 
+> [!important] 当前执行状态
+> 本轮集中开发已封箱，当前没有活动或默认授权的下一 Stage。先阅读[近期封箱快照](./PROJECT-SNAPSHOT.md)；只有用户重新授权后，才进入 `MainTask.md` 和阶段计划选择新的 JIT 开发窗口。
+
 > [!abstract] 文档管理原则
 > 文档按照**面向谁、处于什么阶段、是否仍然有效**来组织，而不是按照复杂的技术名词层层拆分。`docs/README.md` 是唯一入口；新增文档前先判断它的读者和生命周期。
 
@@ -22,6 +25,7 @@ status: active
 ```text
 docs/
 ├── README.md                  # 唯一文档入口和规则说明
+├── PROJECT-SNAPSHOT.md        # 当前封箱状态、限制、延期项与重启协议
 ├── learning/
 │   ├── E0/                    # 路线修复与早期阶段汇报
 │   └── E1～E3/                # Trace、可靠性与安全阶段开发记录
@@ -157,7 +161,7 @@ status: historical-reference
 
 ### 主 Agent 接收任务
 
-先读 `docs/superpowers/mainTask/MainTask.md`，再读阶段性 PR 安排和当前 Stage 的 JIT Plan。
+先读 `docs/PROJECT-SNAPSHOT.md`。当前没有活动 Stage；用户重新授权后，再读 `MainTask.md`、阶段性 PR 安排和目标 Stage 的新 JIT Plan。
 
 ### 新 Agent 接班
 
@@ -165,8 +169,8 @@ status: historical-reference
 
 1. 项目根目录 `CLAUDE.md`；
 2. `docs/README.md`；
-3. `docs/superpowers/mainTask/MainTask.md`；
-4. `docs/superpowers/mainTask/Prompt.md` 中当前已授权 PR Stage；
+3. `docs/PROJECT-SNAPSHOT.md`；
+4. `docs/superpowers/mainTask/MainTask.md`；
 5. [修订路线](./superpowers/plans/2026-08-24-enterprise-harness-revised-development-roadmap.md)；
 6. [阶段性 PR 安排](./superpowers/plans/2026-08-24-enterprise-harness-staged-pr-plan.md)；
 7. 当前 Stage 的 JIT Plan 和前序 Dev Doc/交接；
@@ -176,8 +180,8 @@ status: historical-reference
 
 - PR-00～PR-09：Resume Release R1 已合并并标记为 evidenced。
 - PR-14 / E8 Developer Diagnostics：已完成安全解释、恢复指导与可分享诊断报告。
-- PR-10～PR-11 / E4：当前合并实现阶段，交付 Context Provenance、预算估算、Compaction 保真与 Memory 生命周期治理。
-- 下一候选为 PR-12 Multi-Agent Contract & Worktree Baseline；未经单独授权不得启动。
+- PR-10～PR-11 / E4：已完成 Context Provenance、预算估算、Compaction 保真与 Memory 生命周期治理的实现和验证。
+- 项目进入近期维护暂停；PR-12 仅是未来最高优先级候选，不是当前授权任务。
 - 既有文档的历史归属暂不在本文件更新中强制调整；后续新增文档必须遵守本规则。
 
 > [!warning] 维护底线

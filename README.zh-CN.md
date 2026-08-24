@@ -45,15 +45,17 @@ Klaude-Code 当前包含两条相互连接、但性质不同的路线：
 | 路线 | 含义 | 当前位置 |
 |---|---|---|
 | **Original Foundation Track** | 继承并持续加工的功能基础，逐步构建本地 Coding Agent | 阶段 0–34 已实现/持续维护；阶段 35–36 计划中 |
-| **Enterprise Harness Track** | Klaude-Code 独立开展的企业级升级工作 | R1 的 Trace、可靠性、安全与 Evaluation 纵向闭环已完成；R2/R3 待逐项推进 |
+| **Enterprise Harness Track** | Klaude-Code 独立开展的企业级升级工作 | R1 已形成完整证据闭环；R2 已完成 Diagnostics 与 Context/Memory Governance，现进入近期维护暂停 |
 
 当前实现已经包含终端 CLI、流式模型通信、本地工具、权限、Sandbox、会话、上下文管理、MCP、Skills、Sub-Agent、后台执行、Agent Teams、Hooks、多 Provider、多模态输入以及 Extended Thinking 控制等能力。
 
-第一条企业级 Harness 纵向链路已经闭合：Trace 契约与脱敏、本地弹性 JSONL 存储，Query、Model Attempt、API Retry、Stream Restart、Tool、Permission 的真实边界事件，以及 Retry/Abort/Recovery、Tool/Permission、文件/进程/MCP 外部安全契约。E6 以独立 Artifact Store、25 项证据矩阵和受控端到端 Trial 提供确定性 `verify:core` 门禁。R1 只代表这些不变量有证据，不代表真实模型成功率或完整企业产品交付。
+第一条企业级 Harness 纵向链路已经闭合：Trace 契约与脱敏、本地弹性 JSONL 存储，Query、Model Attempt、API Retry、Stream Restart、Tool、Permission 的真实边界事件，以及 Retry/Abort/Recovery、Tool/Permission、文件/进程/MCP 外部安全契约。E6 以独立 Artifact Store、25 项 R1 证据矩阵和受控端到端 Trial 提供确定性 `verify:core` 门禁。其后又完成 Developer Diagnostics、Context Provenance、预算估算、Compaction 保真与 Memory 生命周期治理。R1 和 Post-R1 证据只代表登记的不变量有证据，不代表真实模型成功率或完整企业产品交付。
+
+> **近期维护状态：** 本轮集中开发已经封箱，当前没有正在执行或默认授权的下一 Stage。项目并未废弃，未来会继续推进；近期只处理必要的安全、构建、兼容和文档事实问题。完整快照、剩余边界和重启方式见 [`docs/PROJECT-SNAPSHOT.md`](./docs/PROJECT-SNAPSHOT.md)。
 
 当前运行时仍然保留从原始实现继承而来的兼容标识，包括 npm package 名称 `easy-agent` 和可执行命令 `agent`。完整的 package、CLI、配置和用户数据迁移被有意放在后续 E9 兼容性项目中；本次 README 品牌重定位不声称这项迁移已经完成。
 
-Klaude-Code 当前应被理解为一个正在积极加固的严肃开源工程，而不是已经面向终端用户完全交付的成品。
+Klaude-Code 当前应被理解为一个完成阶段性加固、进入维护暂停的严肃开源工程，而不是已经面向终端用户完全交付的成品。
 
 ## 架构设计
 
@@ -188,7 +190,7 @@ Enterprise Harness Track 并不是再次声称基础功能不存在，而是新�
 
 ### E0 —— 项目基线与工程治理
 
-**状态：** R1 evidenced · 后续领域评测持续演进
+**状态：** Foundation: present · R1 governance evidenced
 
 项目已经建立独立延伸关系、工程记录、Task 1–3 Trace 文档、Worktree 隔离实践和接班材料。下一步治理工作是让这些实践可以被未来的贡献者和 Agent 稳定复用。
 
@@ -203,7 +205,7 @@ Enterprise Harness Track 并不是再次声称基础功能不存在，而是新�
 
 ### E1 —— 可观测性与 Trace 基础
 
-**状态：** Foundation: present · Klaude hardening: in-progress
+**状态：** Foundation: present · R1 evidenced
 
 Task 1–5 已经建立本地结构化 Trace 核心因果链，并把现有模型、重试、工具和权限边界接入同一个证据模型；这些改动观测继承运行时能力，而不是重新实现它们。
 
@@ -239,39 +241,39 @@ docs/
 
 ### E2 —— 运行时可靠性与恢复加固
 
-**状态：** Foundation: inherited · Klaude hardening: not-started
+**状态：** Foundation: inherited · R1 evidenced
 
 基础实现已经包含 API 错误分类、可重试判断、流式重试、abort 处理、韧性路径和上下文溢出处理。E2 将统一这些机制的语义，并通过证据建立可验证的恢复保证。
 
 任务：
 
-- 🔧 统一 transient/permanent 错误类别和重试策略；
-- 🔧 明确 attempt 编号、重试预算、退避和 `Retry-After` 行为；
-- 🔧 在不泄漏请求内容的前提下记录现有重试和流重启决策；
-- 🔧 定义连接断开、部分输出和重复输出风险下的流式恢复；
-- 🔧 统一 abort、timeout、前台、后台和资源释放语义；
-- 🔧 在一个恢复状态模型中区分模型、API、上下文、工具和权限失败；
-- 🔧 在重试不可逆工具动作前明确幂等边界；
+- ✅ 统一 R1 所需的 transient/permanent 错误类别和重试策略；
+- ✅ 明确 attempt 编号、重试预算、退避和 `Retry-After` 行为；
+- ✅ 在不泄漏请求内容的前提下记录现有重试和流重启决策；
+- ✅ 定义建流前失败、部分输出和重复输出风险下的恢复边界；
+- ✅ 统一 R1 主路径的 abort、timeout 和资源释放语义；
+- ✅ 区分模型、API、上下文、工具和权限失败；
+- ✅ 明确不可逆工具动作不得因恢复重复执行；
 - 📋 支持进程中断或崩溃后的 session recovery；
 - 📋 度量成功率、恢复率、重试成本和尾延迟；
 - 🔬 只有在确定性策略形成证据后，才研究自适应恢复策略。
 
 ### E3 —— 工具与权限安全加固
 
-**状态：** Foundation: inherited · Klaude hardening: not-started
+**状态：** Foundation: inherited · R1 evidenced
 
 工具、Permission Mode、Auto Mode 和 Sandbox 控制已经存在。E3 的目标是让它们形成更加一致、可治理、可审计的安全边界。
 
 任务：
 
-- 🔧 加固工具输入 schema、参数校验和输出大小限制；
-- 🔧 统一不同入口下 allow、deny、ask、block 和 bypass 的语义；
-- 🔧 记录权限决策和原因，但不记录敏感正文；
-- 🔧 分类危险命令、路径、权限变更和外部副作用；
-- 🔧 验证 Sandbox 的工作目录、路径穿越、进程、超时和输出边界；
-- 🔧 明确 MCP server 和外部工具的信任边界；
-- 🔧 防止 secret 出现在环境处理、错误、日志或 Trace 中；
-- 🔧 将真实安全问题转化为聚焦的安全回归测试；
+- ✅ 建立 Tool 输入校验先于 Hook、审批、备份和执行的边界；
+- ✅ 统一 R1 入口下 deny、ask、Hook 和 bypass 的优先级语义；
+- ✅ 记录权限决策和原因，但不记录敏感正文；
+- ✅ 约束高风险命令、路径、权限变更和外部副作用；
+- ✅ 验证 Sandbox 的工作目录、路径穿越、进程、超时和输出边界；
+- ✅ 明确 MCP server 和外部工具的信任边界；
+- ✅ 防止 secret 出现在诊断、错误、日志或 Trace 中；
+- ✅ 将安全问题转化为聚焦回归测试；
 - 📋 增加安全策略诊断命令和高风险审批证据；
 - 🔬 只有在不绕过显式用户权限策略的前提下，才研究风险评分。
 
@@ -312,7 +314,7 @@ Sub-Agent、后台执行、Agent Teams 和 Worktree 隔离已经提供并行执�
 
 ### E6 —— Evaluation、Benchmark 与质量门禁
 
-**状态：** Foundation: present · Klaude hardening: in-progress
+**状态：** Foundation: present · R1 evidenced；External Benchmark deferred
 
 E6 使用独立 Evaluation Run Record 与 Artifact Store 判断受控任务是否满足成功标准，不把隐私最小化 Runtime Trace 扩张成完整会话采集。E6-A 骨架在 E1 后提前建立，E6-B 在 E2/E3 后关闭 R1 证据闭环。
 
@@ -347,7 +349,7 @@ Skills、Hooks、MCP、Agent 定义和未来 Plugin 已经形成多个扩展点�
 
 ### E8 —— 开发者体验与诊断
 
-**状态：** Foundation: inherited · Klaude hardening: deferred
+**状态：** Foundation: inherited · Diagnostics v1 present；产品化增强 deferred
 
 E8 将内部证据转化为能够帮助开发者理解和恢复运行的反馈。
 
@@ -359,7 +361,7 @@ E8 将内部证据转化为能够帮助开发者理解和恢复运行的反馈�
 - 📋 提供 session resume 和失败恢复指引；
 - ✅ 增加 Trace 生命周期摘要和文本/JSON 安全诊断报告；
 - ✅ 让诊断输出可以安全分享，不暴露 prompt、secret、绝对项目路径或文件内容；
-- 📋 在 PR-10～PR-13 证据建立后增加 Context/Memory/Sub-Agent 与 usage/cost 解释；
+- ✅ 增加 Context/Memory 安全聚合解释；Sub-Agent 与完整 usage/cost 解释 deferred；
 - 🔬 基于反复出现且有证据支持的失败模式，研究主动诊断。
 
 交互会话中运行 `/doctor` 可同时查看环境健康与当前项目的最新安全证据摘要；开发者也可以在仓库中生成同源的文本或 JSON 报告：
@@ -397,7 +399,7 @@ Original Foundation Track
   阶段 35–36 📋 Planned
 
 Enterprise Harness Track
-  E0 治理           Foundation: present   · Klaude hardening: in-progress
+  E0 治理           Foundation: present   · R1 governance evidenced
   E1 Trace          Foundation: present   · R1 evidenced
   E2 可靠性         Foundation: inherited · R1 evidenced
   E3 安全           Foundation: inherited · R1 evidenced
@@ -409,7 +411,7 @@ Enterprise Harness Track
   E9 发布           Foundation: inherited · Klaude hardening: deferred
 ```
 
-当前定位有意比长期愿景更窄：Klaude-Code 已经拥有本地 Coding Agent 的功能基础，也已经部分完成结构化 Trace 基础。Enterprise Harness Track 是一项正在进行的加固与评估计划，并不声称项目已经成为 Claude Code 或 Codex 的完整生产替代品。
+当前定位有意比长期愿景更窄：Klaude-Code 已经拥有本地 Coding Agent 功能基础，以及经过证据门验证的 Trace、可靠性、安全、Evaluation、Diagnostics 和 Context/Memory 治理 Slice。剩余路线已明确延期；项目并不声称已经成为 Claude Code 或 Codex 的完整生产替代品。
 
 ## Klaude-Code 是什么，以及它不是什么
 
@@ -509,19 +511,23 @@ agent --auto
 agent --dump-system-prompt
 ```
 
-## 近期重点
+## 近期封箱与未来计划
 
-近期重点将遵循 Enterprise Harness Track，而不是把原始基础路线误认为已经完成的产品工作：
+当前开发快照如下：
 
 1. PR-00～PR-09 已形成 Trace→Reliability→Safety→Evaluation 的 Resume Release R1 证据闭环；
-2. R1 后按 Bad Case 与求职价值，在 E4 Context/Memory、E5 Multi-Agent、E8 Diagnostics 中逐项选择；
-3. E7 Extension Governance、E6-C External Benchmark 与 E9 Packaging/Release 保持长期路线。
+2. PR-14 Developer Diagnostics 与 PR-10～PR-11 Context/Memory Governance 已完成实现和确定性验证；
+3. 按 PR-00～PR-17 的 Stage 口径已完成 13/18，约 72%；该比例不是产品完成度；
+4. 项目近期进入维护暂停，不主动启动 PR-12、PR-13 或 R3 工作；
+5. 未来恢复时优先重新评估 PR-12 Multi-Agent Contract，再考虑 PR-13 Recovery、PR-15 Extensions、PR-16 External Benchmark 和 PR-17 Packaging/Release。
+
+封箱状态、诚实限制、维护规则和重启协议统一记录在 [`docs/PROJECT-SNAPSHOT.md`](./docs/PROJECT-SNAPSHOT.md)。路线仍然有效，但任何后续 Stage 都必须重新授权并编写新的 JIT Plan。
 
 ## 贡献策略
 
 Klaude-Code **当前暂不接受外部贡献**。
 
-项目仍处于积极加固阶段。随着 Enterprise Harness Track 产生新的证据，运行时行为、package 身份、目录结构和开发约定都可能发生变化。等项目拥有稳定的贡献模型、质量门禁、安全边界和发布流程后，再考虑开放外部贡献。
+项目当前处于维护暂停，且 package 身份、目录结构、贡献模型与发布流程仍未稳定。等未来完成 E9 兼容发布边界并重新评估维护能力后，再考虑开放外部贡献。
 
 在此之前，欢迎关注公开路线图、学习实现并参考上游项目，但暂时不会接收 Pull Request 或外部代码贡献。
 
