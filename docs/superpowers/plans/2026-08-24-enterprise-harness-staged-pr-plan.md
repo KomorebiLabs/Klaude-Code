@@ -256,6 +256,8 @@ R2 不设为 R1 的隐含前置。默认优先级为 Context/Memory → Multi-Ag
 
 ### PR-10 — E4-A Context Provenance & Budget（M）
 
+**状态：** 已与 PR-11 合并实施，等待统一 PR 验证与合并。
+
 **目标：** 解释上下文由哪些安全来源组成、为何进入、占用多少预算，不复制正文。
 
 **交付/证据：** 来源类别、资格、规模和预算决策；Retry/Restart Usage 不重复统计；一条上下文预算受控场景；隐私检查。
@@ -263,6 +265,8 @@ R2 不设为 R1 的隐含前置。默认优先级为 Context/Memory → Multi-Ag
 **非目标：** Memory 检索、复杂 Prompt 优化、大规模 Benchmark。
 
 ### PR-11 — E4-B Compaction & Memory Governance（L）
+
+**状态：** 已与 PR-10 合并实施，等待统一 PR 验证与合并。
 
 **目标：** 保留用户硬约束和关键工程状态，并把当前空实现的 Memory relevance 明确转化为窄、可验证能力或明确延期。
 
@@ -357,4 +361,4 @@ R2 证据稳定后：PR-15 / PR-16 → PR-17
 
 ## 9. 当前下一步
 
-PR-00～PR-09 已合并，Resume Release R1 已标记为 evidenced。当前授权阶段为 **PR-14 / E8 Developer Diagnostics**；它合并后唯一建议下一候选为 **PR-10 / E4-A Context Provenance & Budget**，仍须维护者单独授权，不能自动启动。
+PR-00～PR-09 已合并，Resume Release R1 已标记为 evidenced；PR-14 Developer Diagnostics 已合并。当前授权阶段为合并实施的 **PR-10～PR-11 / E4 Context Provenance & Memory Governance**。本阶段合并后唯一建议下一候选为 **PR-12 / E5-A Multi-Agent Contract & Worktree Baseline**，仍须维护者单独授权，不能自动启动。

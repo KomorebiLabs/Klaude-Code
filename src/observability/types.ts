@@ -15,6 +15,7 @@ export type HarnessTraceEventType =
   | "tool.failed"
   | "permission.requested"
   | "permission.resolved"
+  | "context.assembled"
   | "context.compacted"
   | "token.warning"
   | "trace.degraded";

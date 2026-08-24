@@ -4,6 +4,12 @@ import { buildTokenBudgetSnapshot } from "../utils/tokens.js";
 import type { MessageParam, ContentBlockParam } from "@anthropic-ai/sdk/resources/messages.js";
 import type { Usage } from "../types/message.js";
 import { throwIfAborted } from "../services/api/requestLifecycle.js";
+import {
+  buildCompactionInvariantSnapshot,
+  formatCompactionInvariantInstructions,
+  validateCompactionInvariantRetention,
+  type CompactionInvariantSnapshot,
+} from "./compactionInvariants.js";
 
 export const OLD_TOOL_RESULT_PLACEHOLDER = "[Old tool result content cleared]";
 const MICROCOMPACT_MIN_MESSAGES = 10;
@@ -69,6 +75,9 @@ export interface CompactionResult {
   summary?: string;
   didCompact: boolean;
   didMicroCompact: boolean;
+  invariantDigest?: string;
+  invariantCount?: number;
+  invariantRetention?: "passed" | "failed" | "not_applicable";
 }
 
 export interface CompactionCheckOptions {
@@ -218,8 +227,10 @@ async function summarizeMessages(
   messages: MessageParam[],
   focus: string | undefined,
   options: CompactionCheckOptions,
+  invariantSnapshot: CompactionInvariantSnapshot,
 ): Promise<string> {
   const extraInstruction = focus ? `\n\n## Compact Instructions\n${focus}` : "";
+  const invariantInstruction = formatCompactionInvariantInstructions(invariantSnapshot);
   debugLog("compact", "summary_request", { messageCount: messages.length, focus: focus ?? null, model: options.model ?? null });
 
   throwIfAborted(options.signal);
@@ -229,7 +240,8 @@ async function summarizeMessages(
     maxTokens: 8000,
     signal: options.signal,
     querySource: "background",
-    system: NO_TOOLS_PREAMBLE + BASE_COMPACT_PROMPT + extraInstruction,
+    system: NO_TOOLS_PREAMBLE + BASE_COMPACT_PROMPT + extraInstruction +
+      (invariantInstruction ? `\n\n${invariantInstruction}` : ""),
     messages: [
       {
         role: "user",
@@ -261,6 +273,7 @@ export async function compactMessages(
   options: CompactionCheckOptions = {},
 ): Promise<CompactionResult> {
   throwIfAborted(options.signal);
+  const invariantSnapshot = buildCompactionInvariantSnapshot(messages);
   const microcompactResult = microCompactMessages(messages);
   const microCompacted = microcompactResult.messages;
   const microChanged = JSON.stringify(microCompacted) !== JSON.stringify(messages);
@@ -305,8 +318,29 @@ export async function compactMessages(
     };
   }
 
-  const summary = await summarizeMessages(microCompacted, focus, options);
+  const summary = await summarizeMessages(
+    microCompacted,
+    focus,
+    options,
+    invariantSnapshot,
+  );
   throwIfAborted(options.signal);
+  const retained = validateCompactionInvariantRetention(summary, invariantSnapshot);
+  debugLog("compact", "invariant_retention", {
+    invariantDigest: invariantSnapshot.digest,
+    invariantCount: invariantSnapshot.items.length,
+    retained,
+  });
+  if (!retained) {
+    return {
+      messages,
+      didCompact: false,
+      didMicroCompact: false,
+      invariantDigest: invariantSnapshot.digest,
+      invariantCount: invariantSnapshot.items.length,
+      invariantRetention: "failed",
+    };
+  }
   const desiredTailCount = 8;
   const tailStart = microCompacted.length <= desiredTailCount
     ? microCompacted.length               // short conversation: summary covers everything, no tail
@@ -339,5 +373,8 @@ export async function compactMessages(
     summary,
     didCompact: true,
     didMicroCompact: microChanged,
+    invariantDigest: invariantSnapshot.digest,
+    invariantCount: invariantSnapshot.items.length,
+    invariantRetention: invariantSnapshot.items.length > 0 ? "passed" : "not_applicable",
   };
 }

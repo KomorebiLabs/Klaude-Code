@@ -12,7 +12,8 @@ import {
   type PermissionRuleSet,
   type PermissionSettings,
 } from "../permissions/permissions.js";
-import { buildSystemPrompt, renderSystemPrompt } from "../context/systemPrompt.js";
+import { buildSystemPrompt, buildSystemPromptBundle, renderSystemPrompt } from "../context/systemPrompt.js";
+import { createContextAssembledPayload } from "../context/provenance/index.js";
 import { compactMessages } from "../context/compaction.js";
 import { autoCompactIfNeeded, calculateTokenWarningState } from "../context/autoCompact.js";
 import { tokenCountWithEstimation } from "../utils/tokens.js";
@@ -611,11 +612,16 @@ export class QueryEngine {
       }
     }
 
-    const previewSystemParts = await buildSystemPrompt({
+    const previewSystemBundle = await buildSystemPromptBundle({
       cwd: this.toolContext.cwd,
       userQuery: promptToSubmit,
     });
+    const previewSystemParts = previewSystemBundle.parts;
     const previewSystemPrompt = renderSystemPrompt(previewSystemParts);
+    traceWriter.emit(
+      "context.assembled",
+      createContextAssembledPayload(previewSystemBundle.manifest),
+    );
 
     // Only run compaction when there's meaningful conversation history
     if (this.messages.length > 0) {

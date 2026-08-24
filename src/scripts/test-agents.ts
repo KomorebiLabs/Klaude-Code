@@ -114,7 +114,7 @@ async function main(): Promise<void> {
 
   console.log("\n[3] resolveAgentTools — disallowedTools applies under wildcard");
   const exploreResolved = resolveAgentTools(
-    { disallowedTools: ["Write", "Edit", "MemoryWrite"] },
+    { disallowedTools: ["Write", "Edit", "MemoryWrite", "MemoryDelete"] },
     allTools,
   );
   assert(
