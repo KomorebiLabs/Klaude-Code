@@ -178,6 +178,14 @@ command[info]:
   | ✓ MCP: none configured
   | ✓ Sandbox: sandbox-exec available (enabled)
   | ✓ Settings files valid
+  | Project diagnostics — latest safe evidence
+  | - Overall: unavailable
+  | - Trace: unavailable
+  | - Evaluation: unavailable
+  | Findings
+  | - No actionable finding in the available evidence.
+  | Evidence gaps
+  | - Context provenance, memory lifecycle, and sub-agent lifecycle require later R2 instrumentation.
 <<< handled=true
 
 ### copy

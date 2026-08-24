@@ -30,6 +30,10 @@ import {
   createSafeDiagnosticMessage,
   createSafeUrlSummary,
 } from "../../../observability/redaction.js";
+import {
+  createProjectDiagnosticReport,
+  formatDiagnosticSummary,
+} from "../../../diagnostics/index.js";
 import type { QueryEngineEvent } from "../types.js";
 import type { CommandContext } from "./context.js";
 
@@ -239,6 +243,27 @@ export async function* handleDoctorCommand(
     for (const e of settingsErrors) lines.push(`    - ${e}`);
   }
 
+  // Evidence consumption is deliberately best-effort. A missing, corrupt, or
+  // unreadable artifact must never turn the environment Doctor into a failed
+  // command or change any Query/Permission/Tool behavior.
+  await appendProjectDiagnosticSummary(lines, cwd);
+
   yield { type: "command", kind: "info", message: lines.join("\n") };
   return { handled: true };
+}
+
+export async function appendProjectDiagnosticSummary(
+  lines: string[],
+  cwd: string,
+  loadReport: typeof createProjectDiagnosticReport = createProjectDiagnosticReport,
+): Promise<void> {
+  try {
+    lines.push(formatDiagnosticSummary(await loadReport(cwd)));
+  } catch {
+    lines.push(
+      "Project diagnostics — latest safe evidence",
+      "- Overall: unavailable",
+      "- Diagnostic artifacts could not be read; environment checks above remain valid.",
+    );
+  }
 }

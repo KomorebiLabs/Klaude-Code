@@ -34,7 +34,7 @@ docs/
 ```
 
 > [!important] 当前目录的实际状态
-> 上述目录来自当前 worktree 的实际文件。当前不存在 `docs/engineering/` 或 `docs/other/`，因此不把它们列为有效入口；已有文件不在本次路线修复中移动或重命名。
+> `docs/engineering/specs/` 已包含工程契约；阶段实现事实仍优先从 `docs/learning/E*/` 阅读。当前不存在 `docs/other/`，不把它列为有效入口。
 
 ## 1. `learning/`：面向你的阶段汇报
 
@@ -174,9 +174,9 @@ status: historical-reference
 
 ## 当前状态
 
-- PR-00～PR-08：路线修复、Trace/Inspector、Evaluation Foundation、可靠性恢复、Tool/Permission 与 External Safety 已合并。
-- PR-09 / R1-I Evidence Closure & Resume Release：实现完成，待验证、审查与合并；合并后 R1 标记为 evidenced。
-- R1 后候选为 PR-10 Context Provenance、PR-12 Multi-Agent Contract 或 PR-14 Developer Diagnostics，由维护者单独选择和授权。
+- PR-00～PR-09：Resume Release R1 已合并并标记为 evidenced。
+- PR-14 / E8 Developer Diagnostics：当前实现阶段，将 R1 Trace/Evaluation 转换为安全解释与恢复指导。
+- PR-14 合并后下一候选为 PR-10 Context Provenance；未经单独授权不得启动。
 - 既有文档的历史归属暂不在本文件更新中强制调整；后续新增文档必须遵守本规则。
 
 > [!warning] 维护底线
