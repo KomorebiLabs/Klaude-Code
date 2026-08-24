@@ -45,15 +45,17 @@ Klaude-Code currently has two connected but distinct tracks:
 | Track | Meaning | Current position |
 |---|---|---|
 | **Original Foundation Track** | The inherited and continued functional milestones that built the local coding-agent base | Stages 0–34 implemented/continued; Stages 35–36 planned |
-| **Enterprise Harness Track** | Klaude-Code's independent work to harden that foundation for production-oriented use | E0 foundation established; E1 Trace foundation partially implemented; E2–E7 hardening targets; E8–E9 planned |
+| **Enterprise Harness Track** | Klaude-Code's independent work to harden that foundation for production-oriented use | R1 evidence loop completed; Diagnostics and Context/Memory Governance v1 completed; short-term maintenance pause |
 
 The current implementation already includes a terminal CLI, streaming model communication, local tools, permissions, sandboxing, sessions, context management, MCP, skills, sub-agents, background execution, Agent Teams, hooks, multi-provider support, multimodal input, and extended thinking controls.
 
-The first Enterprise Harness slice is also implemented: Trace contracts and redaction, resilient local JSONL storage, and QueryEngine-level `query.started` / `query.finished` / `query.failed` / `query.aborted` events. Model-attempt Trace, tool/permission Trace, and Evaluation gates remain hardening and planned work.
+The completed Enterprise Harness slices now cover privacy-aware Trace storage and Query/Model/Retry/Stream/Tool/Permission causality, deterministic Evaluation, runtime reliability and recovery, permission and external-execution safety, Developer Diagnostics, Context Provenance, compaction invariant retention, and versioned Memory lifecycle governance. These claims are bounded by deterministic evidence; they do not imply large-scale production use or complete model-quality benchmarking.
+
+> **Maintenance status:** the current concentrated development cycle is sealed and there is no active or implicitly authorized next stage. The project is not abandoned; near-term changes are limited to necessary security, build, compatibility, and documentation corrections. See the [project snapshot](./docs/PROJECT-SNAPSHOT.md) for exact scope, limitations, deferred work, and the restart protocol.
 
 The runtime still contains compatibility identifiers inherited from the original implementation, including the npm package name `easy-agent` and the executable name `agent`. A complete package, CLI, configuration, and user-data migration is intentionally tracked as a later E9 compatibility project; this README repositioning does not claim that migration is complete.
 
-Klaude-Code should currently be understood as a serious open-source engineering project in active hardening, not as a finished end-user product.
+Klaude-Code should currently be understood as a serious open-source engineering snapshot under maintenance pause, not as a finished end-user product.
 
 ## Architecture
 
@@ -183,11 +185,11 @@ Current foundation notes:
 
 ## Klaude-Code Enterprise Harness Track
 
-The Enterprise Harness Track is not a second claim that the foundation features do not exist. It is the next engineering layer: making existing features observable, recoverable, secure, evaluable, and maintainable. Most early phases are therefore marked **🔧 Hardening** rather than **📋 Planned**.
+The Enterprise Harness Track is not a second claim that the foundation features do not exist. It is the engineering layer that makes inherited features observable, recoverable, secure, evaluable, and maintainable. Completed slices are marked by bounded evidence; deferred domains remain explicit.
 
 ### E0 — Project Baseline & Engineering Governance
 
-**Status:** ✅ Implemented · 🔧 Hardening
+**Status:** Foundation present · R1 governance evidenced
 
 The project has established an independent continuation boundary, engineering notes, Task 1–3 Trace documentation, worktree isolation practices, and handoff material. The next governance work makes those practices repeatable for future contributors and agents.
 
@@ -202,9 +204,9 @@ Tasks:
 
 ### E1 — Observability & Trace Foundation
 
-**Status:** 🚧 In Progress
+**Status:** Foundation present · R1 evidenced
 
-Task 1–3 established the first local structured Trace slice. The remaining E1 work connects existing model, retry, tool, and permission boundaries to the same evidence model; it does not reimplement those runtime features.
+The completed R1 Trace work connects Query, model attempts, retry/stream restart, tools, and permission decisions through content-minimal causal evidence. It observes inherited runtime capabilities rather than claiming to reimplement them.
 
 Tasks:
 
@@ -212,14 +214,13 @@ Tasks:
 - ✅ redact sensitive values and keep lifecycle payloads content-minimal;
 - ✅ append and read local JSONL with ordering, path control, and failure isolation;
 - ✅ record QueryEngine `query.started`, `query.finished`, `query.failed`, and `query.aborted`;
-- 🔧 record model request, completion, failure, retry, and stream-restart metadata;
-- 🔧 record tool and permission decisions through safe summaries;
-- 🔧 validate schema versions, sequence monotonicity, and query/span relationships;
-- 🔧 preserve a common `traceId` across the top-level query and nested runtime spans;
-- 📋 add a Trace inspection/export CLI and diagnostic bundle format;
-- 📋 define Trace schema migration and retention rules.
+- ✅ record model request, completion, failure, retry, and stream-restart metadata;
+- ✅ record tool and permission decisions through safe summaries;
+- ✅ validate schema versions, sequence monotonicity, and query/span relationships;
+- ✅ provide a minimal Trace inspector and diagnostics consumer;
+- 📋 define future Trace schema migration and broader export compatibility.
 
-Current evidence: see the current documentation under [`docs/`](./docs/) for the Task 1–3 contract, storage, privacy, and QueryEngine lifecycle work. The current lifecycle payloads do not record prompt contents, system prompts, message bodies, tool input/output contents, stdout/stderr, or API keys.
+Current evidence is indexed under [`docs/`](./docs/) and covers the R1 contract, storage, privacy, Query/Model/Retry/Stream/Tool/Permission lifecycle, Inspector, and Diagnostics consumers. Lifecycle payloads do not record prompt contents, system prompts, message bodies, full tool input/output, stdout/stderr, or API keys.
 
 ### Documentation
 
@@ -228,110 +229,87 @@ The project keeps documentation intentionally simple:
 ```text
 docs/
 ├── README.md                         # single documentation entry point
-├── trace-*.md / task-*.md            # current engineering documents
-├── learning/                         # learning and interview notes
+├── PROJECT-SNAPSHOT.md               # sealed status and restart protocol
+├── learning/E*/                      # implementation facts and learning reports
+├── engineering/specs/                # active engineering contracts
+├── superpowers/                      # long-term roadmap and staged plans
 └── archive/                          # historical plans and retired indexes
 ```
 
-New active task and engineering documents go directly under `docs/`. Do not create additional `engineering/`, `adr/`, `specs/`, `evaluation/`, `dev-docs/`, or `roadmap/` subdirectories. Use `docs/learning/` only for learning/interview material and `docs/archive/` only for historical or superseded documents. Start with [`docs/README.md`](./docs/README.md).
+Start with [`docs/README.md`](./docs/README.md) and the current [project snapshot](./docs/PROJECT-SNAPSHOT.md). Implementation facts live under `docs/learning/E*/`, active contracts under `docs/engineering/specs/`, plans under `docs/superpowers/`, and superseded material under `docs/archive/`.
 
 ### E2 — Runtime Reliability & Recovery Hardening
 
-**Status:** 🔧 Hardening
+**Status:** Foundation inherited · R1 evidenced
 
 The foundation already includes API error classification, retryability decisions, streaming retry behavior, abort handling, resilience paths, and context-overflow handling. E2 consolidates their semantics and adds evidence-backed recovery guarantees.
 
 Tasks:
 
-- 🔧 consolidate transient/permanent error categories and retry policy;
-- 🔧 make attempt numbering, retry budgets, backoff, and `Retry-After` behavior explicit;
-- 🔧 trace existing retry and stream-restart decisions without leaking request content;
-- 🔧 define streaming recovery for connection loss, partial output, and duplicate output risk;
-- 🔧 unify abort, timeout, foreground, background, and resource-release semantics;
-- 🔧 distinguish model, API, context, tool, and permission failures in one recovery state model;
-- 🔧 define idempotency boundaries before retrying irreversible tool actions;
+- ✅ consolidate the R1 transient/permanent error categories and retry policy;
+- ✅ make attempt numbering, retry budgets, backoff, and `Retry-After` behavior explicit;
+- ✅ trace retry and stream-restart decisions without leaking request content;
+- ✅ define recovery boundaries for pre-output failure, partial output, and duplicate-output risk;
+- ✅ unify the R1 abort, timeout, and bounded resource-release semantics;
+- ✅ distinguish model, API, context, tool, and permission failures;
+- ✅ prevent recovery from replaying irreversible tool actions;
 - 📋 recover sessions after process interruption or crash;
 - 📋 measure success rate, recovery rate, retry cost, and tail latency;
 - 🔬 investigate adaptive recovery policies only after deterministic policies have evidence.
 
 ### E3 — Tool & Permission Safety Hardening
 
-**Status:** 🔧 Hardening
+**Status:** Foundation inherited · R1 evidenced
 
 Tools, permission modes, Auto Mode, and sandbox controls already exist. E3 turns them into a more consistently governed and auditable safety boundary.
 
 Tasks:
 
-- 🔧 harden tool input schemas, parameter validation, and output-size limits;
-- 🔧 make allow, deny, ask, block, and bypass semantics consistent across entrypoints;
-- 🔧 trace permission decisions and reasons without recording sensitive content;
-- 🔧 classify dangerous commands, paths, privilege changes, and external side effects;
-- 🔧 verify sandbox working-directory, path-traversal, process, timeout, and output boundaries;
-- 🔧 define the trust boundary for MCP servers and externally supplied tools;
-- 🔧 prevent secrets from appearing in environment handling, errors, logs, or Trace;
-- 🔧 convert real safety failures into focused security regressions;
+- ✅ validate Tool input before hooks, approval, backup, and execution;
+- ✅ define R1 precedence for deny, ask, hooks, and bypass across entrypoints;
+- ✅ trace permission decisions and reasons without recording sensitive content;
+- ✅ constrain dangerous commands, paths, privilege changes, and external side effects;
+- ✅ verify sandbox working-directory, path-traversal, process, timeout, and output boundaries;
+- ✅ define the trust boundary for MCP servers and externally supplied tools;
+- ✅ prevent secrets from appearing in diagnostics, errors, logs, or Trace;
+- ✅ convert safety failures into focused security regressions;
 - 📋 add a security-policy diagnostic command and auditable high-risk approval evidence;
 - 🔬 investigate risk scoring only if it cannot bypass explicit user permission policy.
 
 ### E4 — Context, Memory & Cost Governance
 
-**Status:** 🔧 Hardening
+**Status:** Context Provenance and Memory Governance v1 present; full usage/cost and semantic retrieval deferred
 
 Context loading, compaction, memory, project instructions, session history, and token budgets already exist. E4 makes their information-flow and cost behavior explainable and testable.
 
 Tasks:
 
-- 🔧 record context provenance and why each source is eligible for inclusion;
+- ✅ record context provenance, eligibility, load status, and deterministic token estimates without copying content;
 - 🔧 clarify boundaries among system prompt, project instructions, memory, session history, tools, and attachments;
-- 🔧 evaluate whether compaction preserves task-critical constraints and decisions;
-- 🔧 unify manual and automatic compaction semantics and failure handling;
-- 🔧 protect memory retrieval from stale, irrelevant, or contaminated entries;
+- ✅ fail closed when compaction omits required task invariants;
+- ✅ add Memory source, revision, expiry, path isolation, and recoverable deletion;
+- ✅ expose stale/legacy governance state without claiming semantic retrieval;
 - 🔧 account for input/output/cache usage and model-call cost;
 - 🔧 govern context budgets for long conversations, tool output, files, and images;
 - 🔧 recover predictably from context overflow or compaction failure;
 - 📋 add context and memory inspection commands plus evaluation fixtures;
 - 🔬 investigate task-aware dynamic context budgets only after provenance and regression evidence exist.
 
-### E5 — Evaluation, Replay & Quality Gates
+### E5 — Multi-Agent & Worktree Orchestration
 
-**Status:** 📋 Planned
+**Status:** Foundation inherited · Klaude hardening deferred
 
-E5 closes the loop by consuming structured Trace instead of judging only the final text. It begins after the runtime evidence model is stable enough to produce meaningful fixtures.
+Sub-Agents, background execution, Agent Teams, and Worktree isolation already provide parallel execution primitives. Future PR-12 and PR-13 will add explicit task contracts, ownership, worktree baselines, Parent/Child evidence, recovery, merge, and handoff discipline. None of that future hardening is claimed as complete.
 
-Tasks:
+### E6 — Evaluation, Replay & Quality Gates
 
-- 📋 validate Trace schema, sequence order, lifecycle completeness, and privacy invariants;
-- 📋 evaluate model retry, stream recovery, final failure, and abort behavior;
-- 📋 evaluate permission decisions and tool-call safety boundaries;
-- 📋 evaluate context loading, compaction, memory retrieval, and budget behavior;
-- 📋 create deterministic replayable Trace fixtures;
-- 📋 compare behavior changes across commits and produce machine-readable results;
-- 📋 add a minimal pre-merge regression gate for high-value invariants;
-- 📋 generate human-readable Evaluation reports with failure explanations;
-- 🔬 investigate outcome-quality evaluation only after process-level checks are deterministic.
+**Status:** Foundation present · R1 evidenced; external benchmark deferred
 
-### E6 — Multi-Agent & Worktree Orchestration
-
-**Status:** 🔧 Hardening
-
-Sub-Agents, background execution, Agent Teams, and Worktree isolation already provide parallel execution primitives. E6 adds ownership, baseline, recovery, merge, and handoff discipline around them.
-
-Tasks:
-
-- 🔧 decompose work into independently verifiable tasks with explicit outputs;
-- 🔧 declare file ownership and preflight overlapping write plans;
-- 🔧 choose `fresh`, `head`, or a specific commit as an explicit worktree baseline;
-- 🔧 document Subagent snapshot semantics and information handoff;
-- 🔧 separate worker test evidence from main-session post-merge verification;
-- 🔧 recover from agent timeout, blockage, partial completion, and failed cleanup;
-- 🔧 audit uncommitted, untracked, unmerged, and unpublished work before removing worktrees;
-- 🔧 preserve handoff status, artifacts, tests, and next actions;
-- 📋 automate ownership/conflict checks and parallel-task dependency graphs;
-- 🔬 investigate risk-aware concurrency decisions only after ownership and merge evidence are reliable.
+E6 consumes structured evidence rather than judging only final text. It now provides deterministic Task/Trial/Grader/Result contracts, an independent Artifact Store, machine-readable and Markdown reports, the R1 invariant matrix, and the `verify:core` gate. Real-model external benchmarking remains separate from deterministic CI and is deferred to PR-16.
 
 ### E7 — Extension & Plugin Ecosystem Hardening
 
-**Status:** 🔧 Hardening
+**Status:** Foundation inherited · Klaude hardening deferred
 
 Skills, Hooks, MCP, Agent definitions, and future plugins already form several extension points. E7 establishes shared lifecycle and capability boundaries before expanding distribution.
 
@@ -349,23 +327,24 @@ Tasks:
 
 ### E8 — Developer Experience & Diagnostics
 
-**Status:** 📋 Planned · 🔬 Research Direction
+**Status:** Diagnostics v1 present; further productization deferred
 
 E8 turns internal evidence into information that helps a developer understand and recover from a run.
 
 Tasks:
 
 - 📋 explain configuration sources, precedence, and effective settings;
-- 📋 improve `/doctor` coverage for provider, permissions, sandbox, MCP, sessions, and dependencies;
-- 📋 show understandable retry, permission, compaction, and recovery feedback;
+- ✅ extend `/doctor` with current project evidence;
+- ✅ show bounded retry, permission, tool, query, and recovery guidance;
 - 📋 provide session resume and failure-recovery guidance;
-- 📋 add Trace summaries, execution timelines, usage/cost inspection, and failure bundles;
-- 📋 make diagnostic output safe to share without exposing prompts, secrets, or file contents;
+- ✅ add safe Trace and Context/Memory summaries in text and JSON reports;
+- ✅ keep diagnostic output shareable without prompts, secrets, absolute project paths, or file contents;
+- 📋 add Sub-Agent lifecycle and complete usage/cost explanations after their evidence exists;
 - 🔬 investigate proactive diagnostics based on repeated, evidence-backed failure patterns.
 
 ### E9 — Packaging, Compatibility & Operational Readiness
 
-**Status:** 📋 Planned · 🔬 Research Direction
+**Status:** Foundation inherited · Klaude hardening deferred
 
 E9 is where the runtime identity can be migrated carefully. It is intentionally not part of this README-only repositioning.
 
@@ -389,19 +368,19 @@ Original Foundation Track
   Stages 35–36 📋 Planned
 
 Enterprise Harness Track
-  E0 Governance       ✅ Implemented · 🔧 Hardening
-  E1 Trace            🚧 In Progress (Task 1–3 implemented; runtime expansion next)
-  E2 Reliability      🔧 Hardening
-  E3 Safety           🔧 Hardening
-  E4 Context/Memory   🔧 Hardening
-  E5 Evaluation       📋 Planned
-  E6 Multi-Agent      🔧 Hardening
-  E7 Extensions       🔧 Hardening
-  E8 Diagnostics      📋 Planned · 🔬 Research Direction
-  E9 Release          📋 Planned · 🔬 Research Direction
+  E0 Governance       R1 evidenced
+  E1 Trace            R1 evidenced
+  E2 Reliability      R1 evidenced
+  E3 Safety           R1 evidenced
+  E4 Context/Memory   Governance v1 present
+  E5 Multi-Agent      Deferred
+  E6 Evaluation       R1 evidenced
+  E7 Extensions       Deferred
+  E8 Diagnostics      Diagnostics v1 present
+  E9 Release          Deferred
 ```
 
-The current position is deliberately narrower than the long-term vision: Klaude-Code has a functional local coding-agent foundation and a partially implemented structured Trace foundation. The Enterprise Harness Track is an active hardening and evaluation program, not a claim that the project is already a finished production replacement for Claude Code or Codex.
+The current position is deliberately narrower than the long-term vision: Klaude-Code has a functional local coding-agent foundation and evidence-backed slices across Trace, reliability, safety, Evaluation, Diagnostics, and Context/Memory governance. Remaining work is explicitly deferred, and the project does not claim to be a finished production replacement for Claude Code or Codex.
 
 ## What Klaude-Code Is — and Is Not
 
@@ -501,21 +480,17 @@ agent --auto
 agent --dump-system-prompt
 ```
 
-## Near-Term Priorities
+## Sealed Snapshot and Future Work
 
-The near-term priorities follow the Enterprise Harness Track rather than treating the original foundation as finished product work:
+The project has completed PR-00 through PR-11 plus PR-14: 13 of the 18 staged roadmap items (about 72%). This is roadmap execution progress, not product completeness. There is no active near-term feature stage.
 
-1. continue the E1 Trace slice with model-attempt and tool/permission events;
-2. harden existing retry, streaming, permission, sandbox, context, memory, and Worktree behavior;
-3. design the first deterministic Trace-based Evaluation fixtures;
-4. document each hardening slice with its boundary, evidence, and regression result;
-5. keep Stage 35–36 plugin and packaging work behind the required lifecycle, security, compatibility, and release gates.
+When development resumes, PR-12 Multi-Agent Contract is the first candidate, followed by PR-13 Recovery, PR-15 Extension Governance, PR-16 External Benchmark, and PR-17 Packaging/Release. Each remains deferred until explicitly authorized with a fresh implementation plan. See the [project snapshot](./docs/PROJECT-SNAPSHOT.md).
 
 ## Contribution Policy
 
 Klaude-Code is **not accepting external contributions at this stage**.
 
-The project is still in active hardening. Runtime behavior, package identity, directory layout, and development conventions may change as the Enterprise Harness Track produces evidence. External contributions will be considered after the project has a stable contribution model, quality gates, security boundaries, and release process.
+The project is currently under maintenance pause. Package identity, contribution governance, and release procedures are not yet stable. External contributions will be reconsidered only after the future E9 compatibility and release boundaries are defined.
 
 Until then, you are welcome to follow the public roadmap, study the implementation, and reference the upstream project. Pull requests and outside code contributions are intentionally postponed for now.
 

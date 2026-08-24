@@ -27,6 +27,9 @@ aliases:
 >
 > 根目录 README 负责对外介绍项目；ADR 负责记录重大技术决策；Specs 负责定义技术契约；Dev Docs 负责记录具体 Task 的实现事实。若局部实现计划与本文档冲突，应先核对代码现状和新证据，再显式修订本文档，而不是静默偏离路线。
 
+> [!note] 2026-08-24 封箱状态
+> Resume Release R1、Developer Diagnostics、Context Provenance 与 Memory Governance v1 已完成实现和证据收口。项目近期进入维护暂停，当前没有活动 Stage；未来恢复入口、剩余限制和候选顺序以 [`docs/PROJECT-SNAPSHOT.md`](../../PROJECT-SNAPSHOT.md) 为准。本文仍是长期方向，不构成自动执行授权。
+
 ## 0. 项目目标与成功定义
 
 ### 0.1 项目使命

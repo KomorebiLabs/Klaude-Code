@@ -18,6 +18,8 @@ tags:
 
 # Klaude-Code Enterprise Harness 未来开发路线审计与修订计划
 
+> **当前状态说明：** 本文保留路线审计和设计依据；当前执行状态已进入 maintenance pause。已完成范围、延期项与未来重启协议以 [`docs/PROJECT-SNAPSHOT.md`](../../PROJECT-SNAPSHOT.md) 为准，本文末尾早期“下一步”不再构成当前授权。
+
 > **For agentic workers:** 后续实施必须先为当前 Slice 编写 Just-in-Time Implementation Plan，并使用 `executing-plans` 或在明确授权后使用 `subagent-driven-development` 逐项执行。本文是路线级约束，不是允许一次性修改所有阶段的文件级计划。
 
 **Goal:** 将现有 E0–E9 长期愿景收敛为一条真实、可执行、可验证、可答辩的开发路线，优先交付能够支撑实习与校招简历的 Agent Harness 核心工程闭环。

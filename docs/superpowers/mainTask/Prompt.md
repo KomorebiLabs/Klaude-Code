@@ -2,11 +2,14 @@
 title: "Klaude-Code 新开发窗口启动提示词"
 date: 2026-08-06
 updated: 2026-08-24
-status: active
+status: maintenance-pause
 execution_model: one-authorized-pr-stage-per-window
 ---
 
 # Klaude-Code 新开发窗口启动提示词
+
+> [!warning] 当前无活动开发 Stage
+> 本轮集中开发已封箱。开始任何新能力前，必须先阅读 [`docs/PROJECT-SNAPSHOT.md`](../../PROJECT-SNAPSHOT.md)，由用户重新授权一个 Stage，并为该 Stage 新建 JIT Implementation Plan。PR-12 只是未来候选，不是默认授权。
 
 > 每个开发窗口只执行一个已获用户授权的 PR Stage。不得因为本文列出了后续阶段而提前修改、Commit、Push、创建 PR 或合并。
 

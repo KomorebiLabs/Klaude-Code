@@ -2,13 +2,15 @@
 title: "Klaude-Code Enterprise Harness 阶段性开发与 PR 安排"
 date: 2026-08-24
 updated: 2026-08-24
-status: proposed-for-adoption
+status: maintenance-pause
 plan_role: staged-pr-execution-register
 roadmap: 2026-08-24-enterprise-harness-revised-development-roadmap.md
 scope: R0-R3
 ---
 
 # Klaude-Code Enterprise Harness 阶段性开发与 PR 安排
+
+> **当前封箱状态：** PR-00～PR-11 与 PR-14 已完成实现和证据收口，项目近期没有活动 Stage。PR-12、PR-13、PR-15～PR-17 全部延期，只有用户重新授权后才能启动。当前事实入口见 [`docs/PROJECT-SNAPSHOT.md`](../../PROJECT-SNAPSHOT.md)。
 
 > **For agentic workers:** 每次只执行本文一个已获用户授权的 PR Stage。进入代码实现前，必须为该 Stage 编写 Just-in-Time Implementation Plan，并使用 `executing-plans` 逐项执行。不得因为本文列出了后续阶段而提前修改后续文件。
 
@@ -256,7 +258,7 @@ R2 不设为 R1 的隐含前置。默认优先级为 Context/Memory → Multi-Ag
 
 ### PR-10 — E4-A Context Provenance & Budget（M）
 
-**状态：** 已与 PR-11 合并实施，等待统一 PR 验证与合并。
+**状态：** 已与 PR-11 合并实施并完成统一验证。
 
 **目标：** 解释上下文由哪些安全来源组成、为何进入、占用多少预算，不复制正文。
 
@@ -266,7 +268,7 @@ R2 不设为 R1 的隐含前置。默认优先级为 Context/Memory → Multi-Ag
 
 ### PR-11 — E4-B Compaction & Memory Governance（L）
 
-**状态：** 已与 PR-10 合并实施，等待统一 PR 验证与合并。
+**状态：** 已与 PR-10 合并实施并完成统一验证。
 
 **目标：** 保留用户硬约束和关键工程状态，并把当前空实现的 Memory relevance 明确转化为窄、可验证能力或明确延期。
 
@@ -276,6 +278,8 @@ R2 不设为 R1 的隐含前置。默认优先级为 Context/Memory → Multi-Ag
 
 ### PR-12 — E5-A Multi-Agent Contract & Worktree Baseline（M）
 
+**状态：** deferred；未来恢复开发时的最高优先级候选，当前未授权。
+
 **目标：** 定义 Goal/Input/Output/Owner/Dependency/Handoff、文件所有权与 Worktree baseline。
 
 **交付/证据：** 冲突预检；fresh/head/specific commit 可解释；Parent/Child Snapshot 差异可见；子 Agent 拥有独立 Trace 身份。
@@ -284,6 +288,8 @@ R2 不设为 R1 的隐含前置。默认优先级为 Context/Memory → Multi-Ag
 
 ### PR-13 — E5-B Multi-Agent Recovery & Integration（M）
 
+**状态：** deferred；依赖 PR-12，当前未授权。
+
 **目标：** 处理 Timeout、Partial Completion、失败交接和主会话最终责任。
 
 **交付/证据：** 一个受控并行任务；失败/超时后状态、文件、验证和未完成项保留；删除 Worktree 前审计；主会话整合判断。
@@ -291,6 +297,8 @@ R2 不设为 R1 的隐含前置。默认优先级为 Context/Memory → Multi-Ag
 **非目标：** Dynamic Workflow、无人值守自治发布。
 
 ### PR-14 — E8 Developer Diagnostics（M）
+
+**状态：** evidenced；Diagnostics v1 已完成，后续产品化增强延期。
 
 **目标：** 将已有 Trace/Evaluation/Recovery 证据产品化为可演示的 Doctor、Timeline 和安全诊断包。
 
@@ -302,17 +310,23 @@ R2 不设为 R1 的隐含前置。默认优先级为 Context/Memory → Multi-Ag
 
 ### PR-15 — E7 Extension Lifecycle Governance（L）
 
+**状态：** deferred；当前未授权。
+
 **目标：** 在真实 Plugin 基础存在后，统一 Skills/Hooks/MCP/Agent Definitions/Plugins 的 metadata、capability、provenance、compatibility、failure isolation 和 permission。
 
 **启动条件：** 先确认 Plugin loading/scope 已有可信实现；如果仍为空缺，不以“治理”名义同时发明完整插件平台，应另立基础能力提案。
 
 ### PR-16 — E6-C Controlled External Benchmark & CI Expansion（L）
 
+**状态：** deferred；当前未授权。
+
 **目标：** 在安全副本上运行少量固定 Coding Tasks，形成真实 Trial、成本、失败分类和回归证据；按需要扩展 CI。
 
 **约束：** 不预设仓库数/任务数；样本由 Invariant-to-Evidence Matrix 决定；真实 API 不进 CI；不从少量 Trial 推断统计成功率。
 
 ### PR-17 — E9 Compatibility, Packaging & Release（L）
+
+**状态：** deferred；当前未授权。
 
 **目标：** 分阶段完成 package/CLI identity、Settings/Session/Memory/Trace 数据兼容迁移、主要平台验证、Version/Changelog/Upgrade/Rollback。
 
@@ -357,8 +371,8 @@ R2 证据稳定后：PR-15 / PR-16 → PR-17
 - [ ] `git diff` 未吸收用户既有改动；
 - [ ] 用户要求 Commit 前已运行 GitNexus `detect_changes`；
 - [ ] 未经授权没有 commit、push、PR、merge、rebase 或 clean；
-- [ ] 交接只指向一个准确的下一候选 Stage。
+- [ ] 交接指向一个准确候选 Stage，或显式声明 maintenance pause 无活动 Stage。
 
 ## 9. 当前下一步
 
-PR-00～PR-09 已合并，Resume Release R1 已标记为 evidenced；PR-14 Developer Diagnostics 已合并。当前授权阶段为合并实施的 **PR-10～PR-11 / E4 Context Provenance & Memory Governance**。本阶段合并后唯一建议下一候选为 **PR-12 / E5-A Multi-Agent Contract & Worktree Baseline**，仍须维护者单独授权，不能自动启动。
+PR-00～PR-09 已形成 Resume Release R1，PR-14 Developer Diagnostics 与 PR-10～PR-11 Context/Memory Governance 已完成。本轮集中开发现已封箱，**当前没有授权中的下一 Stage**。未来恢复时优先重新评估 PR-12，但必须先核对最新代码与证据、获得用户授权并新建 JIT Plan，不能自动启动。
