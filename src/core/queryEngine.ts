@@ -23,6 +23,7 @@ import { buildUserMessageContent } from "./attachImages.js";
 import type { ToolContext } from "../tools/Tool.js";
 import type { Usage } from "../types/message.js";
 import type { ModelProfile } from "../services/api/providers/profile.js";
+import { classifyAPIError } from "../services/api/errors.js";
 import { getPlanFilePath, planExists as checkPlanExists } from "../context/plans.js";
 import { getPlanModeAttachment, getPlanModeExitAttachment } from "../context/planAttachments.js";
 import { getTaskMode, setTaskMode } from "../state/taskModeStore.js";
@@ -111,6 +112,8 @@ import {
   createQueryFinishedPayload,
   createQueryStartedPayload,
   createTraceWriter,
+  getQueryTerminalEventType,
+  type TraceSink,
 } from "../observability/index.js";
 
 export class QueryEngine {
@@ -481,6 +484,23 @@ export class QueryEngine {
   private async *submitInternal(
     trimmed: string,
   ): AsyncGenerator<QueryEngineEvent, { handled: boolean; reason?: LoopTerminationReason }> {
+    const abortController = new AbortController();
+    this.abortController = abortController;
+    let traceWriter: TraceSink | undefined;
+    let terminalEmitted = false;
+
+    try {
+      traceWriter = await createTraceWriter(this.toolContext.cwd, randomUUID());
+      traceWriter.emit(
+        "query.started",
+        createQueryStartedPayload({
+          model: this.getActiveModel(),
+          permissionMode: this.currentPermissionMode,
+          messageCount: this.messages.length,
+          promptLength: trimmed.length,
+          hasUserPrompt: trimmed.length > 0,
+        }),
+      );
 
     // ─── Stage 26: open the file-history snapshot for this turn ─────
     // Fire at turn start (before any edit) so the snapshot bound to this
@@ -490,6 +510,11 @@ export class QueryEngine {
     // null id (shouldn't happen — beginUserTurn runs first) is backfilled.
     if (!this.currentMessageId) this.beginUserTurn();
     await fileHistoryMakeSnapshot(this.currentMessageId!);
+    if (abortController.signal.aborted) {
+      traceWriter.emit("query.aborted", createQueryAbortedPayload());
+      terminalEmitted = true;
+      return { handled: true, reason: "aborted" };
+    }
 
     // ─── Stage 22: SessionStart hook (one-shot per process) ─────────
     // Source fires SessionStart from the bootstrap path; we delay
@@ -502,7 +527,13 @@ export class QueryEngine {
       const startOutcome = await runSessionStartHooks({
         source: this.messages.length === 0 ? "startup" : "resume",
         cwd: this.toolContext.cwd,
+        signal: abortController.signal,
       });
+      if (abortController.signal.aborted) {
+        traceWriter.emit("query.aborted", createQueryAbortedPayload());
+        terminalEmitted = true;
+        return { handled: true, reason: "aborted" };
+      }
       const startCtx = startOutcome.additionalContext;
       if (startCtx) {
         const startMessage: MessageParam = {
@@ -534,13 +565,28 @@ export class QueryEngine {
       const userOutcome = await runUserPromptSubmitHooks({
         prompt: trimmed,
         cwd: this.toolContext.cwd,
+        signal: abortController.signal,
       });
+      if (abortController.signal.aborted) {
+        traceWriter.emit("query.aborted", createQueryAbortedPayload());
+        terminalEmitted = true;
+        return { handled: true, reason: "aborted" };
+      }
       if (userOutcome.blockingError) {
         yield {
           type: "command",
           kind: "error",
           message: `[UserPromptSubmit hook blocked] ${userOutcome.blockingError}`,
         };
+        traceWriter.emit(
+          "query.finished",
+          createQueryFinishedPayload({
+            reason: "hook_blocked",
+            messageCount: this.messages.length,
+            usage: { input_tokens: 0, output_tokens: 0 },
+          }),
+        );
+        terminalEmitted = true;
         return { handled: true };
       }
       if (userOutcome.additionalContext) {
@@ -569,6 +615,7 @@ export class QueryEngine {
         usageAnchorIndex: this.usageAnchorIndex,
         systemPrompt: previewSystemPrompt,
         model: this.getActiveModel(),
+        signal: abortController.signal,
       });
       if (microResult.didMicroCompact || microResult.didCompact) {
         this.messages = [...microResult.messages];
@@ -589,6 +636,7 @@ export class QueryEngine {
           usage: this.lastCallUsage,
           usageAnchorIndex: this.usageAnchorIndex,
           systemPrompt: previewSystemPrompt,
+          signal: abortController.signal,
         },
       );
       if (didAutoCompact) {
@@ -608,6 +656,12 @@ export class QueryEngine {
       if (warningState.state !== "normal") {
         yield { type: "token_warning", warning: warningState };
       }
+    }
+
+    if (abortController.signal.aborted) {
+      traceWriter.emit("query.aborted", createQueryAbortedPayload());
+      terminalEmitted = true;
+      return { handled: true, reason: "aborted" };
     }
 
     // Inject plan mode attachments as user messages (before user input)
@@ -671,22 +725,6 @@ export class QueryEngine {
       yield { type: "messages_updated", messages: [...this.messages] };
     }
 
-    const abortController = new AbortController();
-    this.abortController = abortController;
-    const traceWriter = await createTraceWriter(this.toolContext.cwd, randomUUID());
-
-    traceWriter.emit(
-      "query.started",
-      createQueryStartedPayload({
-        model: this.getActiveModel(),
-        permissionMode: this.currentPermissionMode,
-        messageCount: this.messages.length,
-        promptLength: promptToSubmit.length,
-        hasUserPrompt: promptToSubmit.length > 0,
-      }),
-    );
-
-    try {
       const systemParts = previewSystemParts;
       const systemPrompt = renderSystemPrompt(systemParts);
       const enrichedToolContext: ToolContext = {
@@ -743,14 +781,28 @@ export class QueryEngine {
             turnUsage: { ...value.usage },
             lastCallUsage: { ...this.lastCallUsage },
           };
-          traceWriter.emit(
-            "query.finished",
-            createQueryFinishedPayload({
-              reason: value.reason,
-              messageCount: this.messages.length,
-              usage: value.usage,
-            }),
-          );
+          const terminalType = getQueryTerminalEventType(value.reason);
+          if (terminalType === "query.aborted") {
+            traceWriter.emit(terminalType, createQueryAbortedPayload());
+          } else if (terminalType === "query.failed") {
+            traceWriter.emit(
+              terminalType,
+              createQueryFailedPayload(new Error("Query terminated."), {
+                reason: value.reason === "timeout" ? "timeout" : "model_error",
+                errorCategory: value.reason === "timeout" ? "api_timeout" : "model_error",
+              }),
+            );
+          } else {
+            traceWriter.emit(
+              terminalType,
+              createQueryFinishedPayload({
+                reason: value.reason,
+                messageCount: this.messages.length,
+                usage: value.usage,
+              }),
+            );
+          }
+          terminalEmitted = true;
           return { handled: true, reason: value.reason };
         }
 
@@ -767,13 +819,26 @@ export class QueryEngine {
         }
       }
     } catch (error) {
-      traceWriter.emit(
-        abortController.signal.aborted ? "query.aborted" : "query.failed",
-        abortController.signal.aborted ? createQueryAbortedPayload() : createQueryFailedPayload(error),
-      );
+      const errorCategory = classifyAPIError(error);
+      const wasAborted = abortController.signal.aborted || errorCategory === "aborted";
+      const wasTimeout = errorCategory === "api_timeout";
+      if (!terminalEmitted) {
+        traceWriter?.emit(
+          wasAborted ? "query.aborted" : "query.failed",
+          wasAborted
+            ? createQueryAbortedPayload()
+            : createQueryFailedPayload(
+                error,
+                wasTimeout ? { reason: "timeout", errorCategory: "api_timeout" } : undefined,
+              ),
+        );
+        terminalEmitted = true;
+      }
+      if (wasAborted) return { handled: true, reason: "aborted" };
+      if (wasTimeout) return { handled: true, reason: "timeout" };
       throw error;
     } finally {
-      await traceWriter.close();
+      await traceWriter?.close();
       this.abortController = null;
       // Stage 23: drop any per-turn model override so the next prompt
       // reverts to the session/default model.

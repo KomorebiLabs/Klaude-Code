@@ -132,6 +132,8 @@ export interface StreamErrorEvent {
    * re-parsing the error string. Optional so non-API errors stay simple.
    */
   category?: string;
+  /** True when this failed attempt already emitted user-visible content. */
+  outputStarted?: boolean;
 }
 
 /**
