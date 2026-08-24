@@ -211,6 +211,9 @@ export async function runHeadless(options: RunHeadlessOptions): Promise<void> {
     permissionMode: effectiveMode,
     permissionSettings,
     onPermissionRequest,
+    entryPoint: "headless",
+    bypassPermissions: autoApprove,
+    permissionAskSource: autoApprove ? "bypass" : "headless",
   });
 
   const format = options.outputFormat ?? "text";

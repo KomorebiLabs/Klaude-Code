@@ -21,6 +21,10 @@ import { fileHistoryMakeSnapshot } from "../session/fileHistory.js";
 import { getToolsApiParams } from "../tools/index.js";
 import { buildUserMessageContent } from "./attachImages.js";
 import type { ToolContext } from "../tools/Tool.js";
+import type {
+  PermissionResolutionSource,
+  ToolEntryPoint,
+} from "../permissions/permissionContract.js";
 import type { Usage } from "../types/message.js";
 import type { ModelProfile } from "../services/api/providers/profile.js";
 import { classifyAPIError } from "../services/api/errors.js";
@@ -135,6 +139,9 @@ export class QueryEngine {
   private permissionSettings?: PermissionSettings;
   private readonly sessionPermissionRules: PermissionRuleSet;
   private readonly onPermissionRequest?: (request: PermissionRequest) => Promise<PermissionDecision>;
+  private readonly entryPoint: ToolEntryPoint;
+  private readonly bypassPermissions: boolean;
+  private readonly permissionAskSource: PermissionResolutionSource;
   private abortController: AbortController | null = null;
   private usageAnchorIndex: number = -1;
   private lastCallUsage: Usage = { input_tokens: 0, output_tokens: 0 };
@@ -169,6 +176,9 @@ export class QueryEngine {
     this.permissionSettings = options.permissionSettings;
     this.sessionPermissionRules = options.sessionPermissionRules ?? { allow: [], deny: [] };
     this.onPermissionRequest = options.onPermissionRequest;
+    this.entryPoint = options.entryPoint ?? "interactive";
+    this.bypassPermissions = options.bypassPermissions === true;
+    this.permissionAskSource = options.permissionAskSource ?? "user";
   }
 
   getPermissionMode(): PermissionMode {
@@ -740,6 +750,7 @@ export class QueryEngine {
         permissionSettings: this.permissionSettings,
         sessionPermissionRules: this.sessionPermissionRules,
         onPermissionRequest: this.onPermissionRequest,
+        permissionAskSource: this.permissionAskSource,
         defaultModel: this.getActiveModel(),
         // Stage 26: the active turn id, so the loop can back up files
         // (fileHistoryTrackEdit) before Edit/Write run.
@@ -757,6 +768,9 @@ export class QueryEngine {
         permissionSettings: this.permissionSettings,
         sessionPermissionRules: this.sessionPermissionRules,
         onPermissionRequest: this.onPermissionRequest,
+        entryPoint: this.entryPoint,
+        bypassPermissions: this.bypassPermissions,
+        permissionAskSource: this.permissionAskSource,
         traceSink: traceWriter,
       });
 

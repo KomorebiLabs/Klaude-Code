@@ -23,7 +23,8 @@ status: active
 docs/
 ├── README.md                  # 唯一文档入口和规则说明
 ├── learning/
-│   └── E0/                    # 当前既有阶段汇报与 Trace 文档
+│   ├── E0/                    # 路线修复与早期阶段汇报
+│   └── E1～E3/                # Trace、可靠性与安全阶段开发记录
 ├── superpowers/
 │   ├── mainTask/
 │   │   ├── MainTask.md        # 权威长期方向
@@ -173,9 +174,9 @@ status: historical-reference
 
 ## 当前状态
 
-- PR-00～PR-05：路线修复、Trace Storage、Model/Retry/Stream、Tool/Permission、Inspector、Evaluation Foundation 与 Provider Retry Semantics 已合并。
-- PR-06 / R1-F Streaming / Abort / Context Recovery：当前已实现阶段，待 PR 审查与合并。
-- 合并后下一候选是 PR-07 / R1-G Tool / Permission Safety Contract；未经单独授权不得启动。
+- PR-00～PR-06：路线修复、Trace/Inspector、Evaluation Foundation、Provider Retry 与 Streaming/Abort/Context Recovery 已合并。
+- PR-07 / R1-G Tool / Permission Safety Contract：当前已实现阶段，待 PR 审查与合并。
+- 合并后下一候选是 PR-08 / R1-H Sandbox / MCP / Secret Safety；未经单独授权不得启动。
 - 既有文档的历史归属暂不在本文件更新中强制调整；后续新增文档必须遵守本规则。
 
 > [!warning] 维护底线

@@ -34,6 +34,7 @@ import type {
   PermissionRuleSet,
   PermissionSettings,
 } from "../permissions/permissions.js";
+import type { PermissionResolutionSource } from "../permissions/permissionContract.js";
 import { resolveAgentTools } from "./resolveAgentTools.js";
 import type { AgentDefinition, AgentRunResult } from "./types.js";
 import type { ContentBlock, Usage } from "../types/message.js";
@@ -79,6 +80,7 @@ export interface RunChildAgentParams {
   permissionSettings?: PermissionSettings;
   sessionPermissionRules?: PermissionRuleSet;
   onPermissionRequest?: (request: PermissionRequest) => Promise<PermissionDecision>;
+  permissionAskSource?: PermissionResolutionSource;
   /**
    * Headless flag — see RunQueryParams.shouldAvoidPermissionPrompts in
    * core/agenticLoop.ts. Set by `runAsyncAgentLifecycle` for backgrounded
@@ -251,6 +253,10 @@ export async function runChildAgent(params: RunChildAgentParams): Promise<AgentR
     sessionPermissionRules: params.sessionPermissionRules,
     onPermissionRequest: params.onPermissionRequest,
     shouldAvoidPermissionPrompts: params.shouldAvoidPermissionPrompts,
+    entryPoint: params.shouldAvoidPermissionPrompts ? "background_subagent" : "subagent",
+    permissionAskSource: params.shouldAvoidPermissionPrompts
+      ? "background"
+      : (params.permissionAskSource ?? "user"),
     subagentInfo: { agentId: agentIdForHooks, agentType: def.agentType },
     // Stage 27: a backgrounded sub-agent has no one waiting on its result, so
     // a 529 capacity overload should fail fast rather than amplify load.

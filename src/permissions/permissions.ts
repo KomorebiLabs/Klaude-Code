@@ -20,6 +20,10 @@ import {
   isAutoModeCircuitBroken,
   notifyCircuitBreakOnce,
 } from "./autoModeState.js";
+import type {
+  PermissionPolicySource,
+  PermissionReasonCode,
+} from "./permissionContract.js";
 
 export type PermissionBehavior = "allow" | "ask" | "deny";
 export type PermissionMode = "default" | "plan" | "auto";
@@ -44,6 +48,8 @@ export interface PermissionRequest {
 
 export interface PermissionResponse {
   behavior: PermissionBehavior;
+  decisionSource: PermissionPolicySource;
+  reasonCode: PermissionReasonCode;
   reason: string;
   request: PermissionRequest;
 }
@@ -471,30 +477,23 @@ async function resolveAutoModeDecision(
   sessionRules: PermissionRuleSet,
 ): Promise<PermissionResponse> {
   if (isCoordinationTool(params.tool.name)) {
-    return { behavior: "allow", reason: `${params.tool.name} writes coordination-only state`, request };
+    return { behavior: "allow", decisionSource: "coordination_policy", reasonCode: "coordination_safe", reason: `${params.tool.name} writes coordination-only state`, request };
   }
 
   if (params.tool.name === "EnterPlanMode") {
-    return { behavior: "ask", reason: "entering plan mode requires confirmation", request };
-  }
-
-  if (
-    matchesAnyRule(sessionRules.deny, params.tool.name, params.input) ||
-    matchesAnyRule(settings.deny, params.tool.name, params.input)
-  ) {
-    return { behavior: "deny", reason: "matched deny rule", request };
+    return { behavior: "ask", decisionSource: "mode_policy", reasonCode: "mode_transition", reason: "entering plan mode requires confirmation", request };
   }
 
   if (params.tool.name === "Bash") {
     const command = extractBashCommand(params.input);
     if (isHardDeniedBashCommand(command)) {
-      return { behavior: "deny", reason: "high-risk shell command blocked in auto mode", request };
+      return { behavior: "deny", decisionSource: "hard_safety", reasonCode: "auto_hard_deny", reason: "high-risk shell command blocked in auto mode", request };
     }
     if (isReadOnlyCommand(command)) {
-      return { behavior: "allow", reason: "read-only shell command", request };
+      return { behavior: "allow", decisionSource: "read_only", reasonCode: "read_only", reason: "read-only shell command", request };
     }
   } else if (params.tool.isReadOnly()) {
-    return { behavior: "allow", reason: "read-only tool", request };
+    return { behavior: "allow", decisionSource: "read_only", reasonCode: "read_only", reason: "read-only tool", request };
   }
 
   // Honor explicit allow rules — but NOT dangerous ones (interpreters, bare
@@ -506,7 +505,7 @@ async function resolveAutoModeDecision(
     matchesAnyRule(safeSessionAllow, params.tool.name, params.input) ||
     matchesAnyRule(safeSettingsAllow, params.tool.name, params.input)
   ) {
-    return { behavior: "allow", reason: "matched allow rule", request };
+    return { behavior: "allow", decisionSource: "explicit_allow", reasonCode: "matched_allow_rule", reason: "matched allow rule", request };
   }
 
   const verdict = await classifyAutoModeAction({
@@ -525,6 +524,8 @@ async function resolveAutoModeDecision(
     recordClassifierFailure();
     return {
       behavior: "ask",
+      decisionSource: "classifier",
+      reasonCode: "classifier_unavailable",
       reason: `classifier unavailable — manual review (${verdict.reason})`,
       request,
     };
@@ -537,15 +538,17 @@ async function resolveAutoModeDecision(
     if (shouldFallbackToPrompting()) {
       return {
         behavior: "ask",
+        decisionSource: "classifier",
+        reasonCode: "classifier_deny",
         reason: `classifier blocked repeatedly — please review: ${verdict.reason}`,
         request,
       };
     }
-    return { behavior: "deny", reason: verdict.reason, request };
+    return { behavior: "deny", decisionSource: "classifier", reasonCode: "classifier_deny", reason: verdict.reason, request };
   }
 
   recordClassifierSuccess();
-  return { behavior: "allow", reason: `auto-approved: ${verdict.reason}`, request };
+  return { behavior: "allow", decisionSource: "classifier", reasonCode: "classifier_allow", reason: `auto-approved: ${verdict.reason}`, request };
 }
 
 /**
@@ -570,21 +573,15 @@ function resolveWebFetchDecision(
   const url = typeof params.input.url === "string" ? params.input.url : "";
 
   if (url && isPreapprovedUrl(url)) {
-    return { behavior: "allow", reason: "preapproved documentation host", request };
-  }
-  if (
-    matchesAnyRule(sessionRules.deny, "WebFetch", params.input) ||
-    matchesAnyRule(settings.deny, "WebFetch", params.input)
-  ) {
-    return { behavior: "deny", reason: "matched WebFetch deny rule", request };
+    return { behavior: "allow", decisionSource: "domain_policy", reasonCode: "domain_preapproved", reason: "preapproved documentation host", request };
   }
   if (
     matchesAnyRule(sessionRules.allow, "WebFetch", params.input) ||
     matchesAnyRule(settings.allow, "WebFetch", params.input)
   ) {
-    return { behavior: "allow", reason: "matched WebFetch allow rule", request };
+    return { behavior: "allow", decisionSource: "explicit_allow", reasonCode: "matched_allow_rule", reason: "matched WebFetch allow rule", request };
   }
-  return { behavior: "ask", reason: "first fetch from this domain requires confirmation", request };
+  return { behavior: "ask", decisionSource: "domain_policy", reasonCode: "domain_confirmation", reason: "first fetch from this domain requires confirmation", request };
 }
 
 export async function checkPermission(params: PermissionCheckParams): Promise<PermissionResponse> {
@@ -598,6 +595,15 @@ export async function checkPermission(params: PermissionCheckParams): Promise<Pe
     risk: getRiskLabel(params.tool, params.input),
     ruleHint: buildPermissionRuleHint(params.tool.name, params.input),
   };
+
+  // Explicit deny is the non-upgradable safety floor. It must be evaluated
+  // before read-only, coordination, domain, mode, allow, Hook, or bypass paths.
+  if (
+    matchesAnyRule(sessionRules.deny, params.tool.name, params.input) ||
+    matchesAnyRule(settings.deny, params.tool.name, params.input)
+  ) {
+    return { behavior: "deny", decisionSource: "explicit_deny", reasonCode: "matched_deny_rule", reason: "matched deny rule", request };
+  }
 
   // WebFetch domain permission runs in all modes, before any read-only
   // fast-path. (Read-only status alone must NOT auto-allow arbitrary domains.)
@@ -630,55 +636,51 @@ export async function checkPermission(params: PermissionCheckParams): Promise<Pe
   // `removeAgentWorktree` refuses to delete dirty ones — so the user's
   // uncommitted work is never destroyed without their consent.
   if (isCoordinationTool(params.tool.name)) {
-    return { behavior: "allow", reason: `${params.tool.name} writes coordination-only state`, request };
+    return { behavior: "allow", decisionSource: "coordination_policy", reasonCode: "coordination_safe", reason: `${params.tool.name} writes coordination-only state`, request };
   }
 
   // Plan mode: allow read-only tools, plan mode tools, plan file writes; deny everything else
   if (mode === "plan") {
     if (PLAN_ALLOWED_TOOLS.has(params.tool.name)) {
-      return { behavior: "allow", reason: "read-only tool allowed in plan mode", request };
+      return { behavior: "allow", decisionSource: "read_only", reasonCode: "read_only", reason: "read-only tool allowed in plan mode", request };
     }
     if (params.tool.name === "EnterPlanMode" || params.tool.name === "ExitPlanMode") {
-      return { behavior: "ask", reason: "plan mode transition requires confirmation", request };
+      return { behavior: "ask", decisionSource: "mode_policy", reasonCode: "mode_transition", reason: "plan mode transition requires confirmation", request };
     }
     if (params.tool.name === "Bash") {
       const command = extractBashCommand(params.input);
       if (isReadOnlyCommand(command)) {
-        return { behavior: "allow", reason: "read-only shell command allowed in plan mode", request };
+        return { behavior: "allow", decisionSource: "read_only", reasonCode: "read_only", reason: "read-only shell command allowed in plan mode", request };
       }
-      return { behavior: "deny", reason: "plan mode blocks non-read-only Bash commands", request };
+      return { behavior: "deny", decisionSource: "mode_policy", reasonCode: "plan_restriction", reason: "plan mode blocks non-read-only Bash commands", request };
     }
     // Allow writing to the plan file
     if (params.tool.name === "Write") {
       const filePath = typeof params.input.file_path === "string" ? params.input.file_path : "";
       const planPath = getPlanFilePath();
       if (filePath && path.resolve(filePath) === path.resolve(planPath)) {
-        return { behavior: "allow", reason: "writing to plan file is allowed in plan mode", request };
+        return { behavior: "allow", decisionSource: "mode_policy", reasonCode: "plan_file_write", reason: "writing to plan file is allowed in plan mode", request };
       }
     }
-    return { behavior: "deny", reason: `plan mode blocks ${params.tool.name}`, request };
+    return { behavior: "deny", decisionSource: "mode_policy", reasonCode: "plan_restriction", reason: `plan mode blocks ${params.tool.name}`, request };
   }
 
   // EnterPlanMode always requires user approval
   if (params.tool.name === "EnterPlanMode") {
-    return { behavior: "ask", reason: "entering plan mode requires confirmation", request };
+    return { behavior: "ask", decisionSource: "mode_policy", reasonCode: "mode_transition", reason: "entering plan mode requires confirmation", request };
   }
 
   if (params.tool.name === "Bash") {
     const command = extractBashCommand(params.input);
     if (isReadOnlyCommand(command)) {
-      return { behavior: "allow", reason: "read-only shell command", request };
+      return { behavior: "allow", decisionSource: "read_only", reasonCode: "read_only", reason: "read-only shell command", request };
     }
   } else if (params.tool.isReadOnly()) {
-    return { behavior: "allow", reason: "read-only tool", request };
-  }
-
-  if (matchesAnyRule(sessionRules.deny, params.tool.name, params.input) || matchesAnyRule(settings.deny, params.tool.name, params.input)) {
-    return { behavior: "deny", reason: "matched deny rule", request };
+    return { behavior: "allow", decisionSource: "read_only", reasonCode: "read_only", reason: "read-only tool", request };
   }
 
   if (matchesAnyRule(sessionRules.allow, params.tool.name, params.input) || matchesAnyRule(settings.allow, params.tool.name, params.input)) {
-    return { behavior: "allow", reason: "matched allow rule", request };
+    return { behavior: "allow", decisionSource: "explicit_allow", reasonCode: "matched_allow_rule", reason: "matched allow rule", request };
   }
 
   // Sandbox auto-allow gate. If the user has the sandbox on AND policy
@@ -710,13 +712,19 @@ export async function checkPermission(params: PermissionCheckParams): Promise<Pe
         { allow: settings.allow, deny: settings.deny },
         sessionRules,
       );
-      return { behavior: decision.behavior, reason: decision.reason, request };
+      return {
+        behavior: decision.behavior,
+        decisionSource: "sandbox_policy",
+        reasonCode: decision.behavior === "allow" ? "sandbox_auto_allow" : decision.behavior === "deny" ? "matched_deny_rule" : "confirmation_required",
+        reason: decision.reason,
+        request,
+      };
     }
   }
 
   if (params.tool.name === "Bash" && isDangerousBashCommand(extractBashCommand(params.input))) {
-    return { behavior: "ask", reason: "dangerous shell command requires confirmation", request };
+    return { behavior: "ask", decisionSource: "default_policy", reasonCode: "confirmation_required", reason: "dangerous shell command requires confirmation", request };
   }
 
-  return { behavior: "ask", reason: "operation requires confirmation", request };
+  return { behavior: "ask", decisionSource: "default_policy", reasonCode: "confirmation_required", reason: "operation requires confirmation", request };
 }

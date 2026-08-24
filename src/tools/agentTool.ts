@@ -367,6 +367,7 @@ export const agentTool: Tool = {
     const onPermissionRequest = context.onPermissionRequest as
       | ((request: PermissionRequest) => Promise<PermissionDecision>)
       | undefined;
+    const permissionAskSource = context.permissionAskSource;
 
     // Stage 20: resolve isolation. Per-call > definition > "none".
     //
@@ -515,6 +516,7 @@ export const agentTool: Tool = {
         ...(permissionSettings ? { permissionSettings } : {}),
         ...(sessionPermissionRules ? { sessionPermissionRules } : {}),
         ...(onPermissionRequest ? { onPermissionRequest } : {}),
+        ...(permissionAskSource ? { permissionAskSource } : {}),
         ...(worktreeInfo ? { worktreeInfo } : {}),
         ...(teammateIdentity ? { teammateIdentity } : {}),
       });
@@ -659,6 +661,7 @@ export const agentTool: Tool = {
         ...(permissionSettings ? { permissionSettings } : {}),
         ...(sessionPermissionRules ? { sessionPermissionRules } : {}),
         ...(onPermissionRequest ? { onPermissionRequest } : {}),
+        ...(permissionAskSource ? { permissionAskSource } : {}),
         ...(context.abortSignal ? { abortSignal: context.abortSignal } : {}),
         ...(onProgress ? { onProgress } : {}),
         // Stage 20: worktree-isolated runs override the cwd so every
