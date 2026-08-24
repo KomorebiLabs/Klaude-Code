@@ -55,7 +55,7 @@ export const EXPLORE_AGENT: AgentDefinition = {
   // Explicitly deny write tools even though the prompt says so. resolveAgentTools
   // strips Agent automatically; the others are redundant-with-the-prompt belt
   // and suspenders for safety.
-  disallowedTools: ["Write", "Edit", "MemoryWrite"],
+  disallowedTools: ["Write", "Edit", "MemoryWrite", "MemoryDelete"],
   source: "built-in",
   getSystemPrompt: () => SYSTEM_PROMPT,
 };

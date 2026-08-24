@@ -2,7 +2,7 @@ import * as os from "node:os";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { loadAgentMdContext } from "./claudeMd.js";
-import { buildMemoryPromptInstructions, ensureMemoryDirExists, formatMemorySystemLocation, readMemoryEntrypoint, shouldIgnoreMemory } from "./memory/memdir.js";
+import { buildMemoryPromptInstructions, ensureMemoryDirExists, formatMemoryManifest, formatMemorySystemLocation, loadMemoryHeaders, readMemoryEntrypoint, shouldIgnoreMemory } from "./memory/memdir.js";
 import { buildMemoryAccessGuidance, buildMemoryExclusionGuidance, buildMemoryPersistenceBoundaryGuidance, buildMemoryTypeGuidance, buildMemoryValidationGuidance } from "./memory/memoryTypes.js";
 import { formatSkillsSystemReminder } from "../services/skills/budget.js";
 import { getModelVisibleSkills } from "../services/skills/registry.js";
@@ -11,6 +11,8 @@ import { formatTeamSystemReminder } from "../agents/teamPromptInjection.js";
 import { getAllAgents } from "../agents/registry.js";
 import { getActiveOutputStyleConfig } from "../styles/registry.js";
 import { readMergedStringSetting } from "../utils/settings.js";
+import { buildContextManifest, type ContextManifest, type ContextSourceInput } from "./provenance/index.js";
+import { getContextWindowForModel, getEffectiveContextWindowSize } from "../utils/tokens.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -32,6 +34,11 @@ export interface BuildSystemPromptOptions {
   cwd: string;
   additionalInstructions?: string;
   userQuery?: string;
+}
+
+export interface SystemPromptBundle {
+  parts: string[];
+  manifest: ContextManifest;
 }
 
 // Identity framing — always present, regardless of output style.
@@ -108,15 +115,19 @@ function formatEnvironmentContext(context: RuntimeEnvironmentContext): string {
   return lines.join("\n");
 }
 
-export async function buildSystemPrompt(options: BuildSystemPromptOptions): Promise<string[]> {
+export async function buildSystemPromptBundle(
+  options: BuildSystemPromptOptions,
+): Promise<SystemPromptBundle> {
   const ignoreMemory = options.userQuery ? shouldIgnoreMemory(options.userQuery) : false;
   const memoryDir = await ensureMemoryDirExists(options.cwd);
-  const [environmentContext, agentMdContext, memoryEntrypoint, language] = await Promise.all([
+  const [environmentContext, agentMdContext, memoryEntrypoint, memoryHeaders, language] = await Promise.all([
     getRuntimeEnvironmentContext(options.cwd),
     loadAgentMdContext(options.cwd),
     ignoreMemory ? Promise.resolve(null) : readMemoryEntrypoint(options.cwd),
+    ignoreMemory ? Promise.resolve([]) : loadMemoryHeaders(options.cwd).catch(() => []),
     readMergedStringSetting(options.cwd, "language").catch(() => undefined),
   ]);
+  const memoryManifest = formatMemoryManifest(memoryHeaders);
 
   // Stage 23: output style reshapes HOW the agent answers. A non-null
   // config means a non-default style is active; keepCodingInstructions
@@ -130,7 +141,7 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions): Prom
     SYSTEM_PROMPT_STATIC_END,
   ];
 
-  const memorySections = [
+  const memoryGuidanceSections = [
     ...formatMemorySystemLocation(memoryDir),
     ...buildMemoryPromptInstructions(),
     ...buildMemoryTypeGuidance(),
@@ -138,7 +149,11 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions): Prom
     ...buildMemoryAccessGuidance(),
     ...buildMemoryValidationGuidance(),
     ...buildMemoryPersistenceBoundaryGuidance(),
+  ].filter(Boolean);
+  const memorySections = [
+    ...memoryGuidanceSections,
     ignoreMemory ? "Memory is disabled for this turn because the user asked not to use it." : "",
+    memoryManifest ? `Memory governance manifest:\n${memoryManifest}` : "",
     memoryEntrypoint ? `Memory index:\n${memoryEntrypoint}` : "",
   ].filter(Boolean);
 
@@ -193,7 +208,112 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions): Prom
     SYSTEM_PROMPT_DYNAMIC_END,
   ].filter(Boolean);
 
-  return [...staticSections, ...dynamicSections];
+  const parts = [...staticSections, ...dynamicSections];
+  const sourceInputs: ContextSourceInput[] = [
+    {
+      sourceId: "static-instructions",
+      category: "static_instructions",
+      eligibility: "always",
+      content: staticSections.join("\n\n"),
+      loaded: true,
+    },
+    {
+      sourceId: "runtime-environment",
+      category: "environment",
+      eligibility: "current-turn",
+      content: formatEnvironmentContext(environmentContext),
+      loaded: true,
+    },
+    {
+      sourceId: "project-instructions",
+      category: "project_instructions",
+      eligibility: "workspace-policy",
+      content: agentMdContext ?? "",
+      loaded: Boolean(agentMdContext),
+      ...(!agentMdContext ? { omittedReason: "not-found" } : {}),
+    },
+    {
+      sourceId: "memory-guidance",
+      category: "memory_guidance",
+      eligibility: "memory-contract",
+      content: memoryGuidanceSections.join("\n\n"),
+      loaded: memoryGuidanceSections.length > 0,
+    },
+    {
+      sourceId: "memory-index",
+      category: "memory_index",
+      eligibility: ignoreMemory ? "user-disabled" : "project-memory",
+      content: [memoryManifest, memoryEntrypoint ?? ""].filter(Boolean).join("\n\n"),
+      loaded: !ignoreMemory && Boolean(memoryManifest || memoryEntrypoint),
+      ...(
+        ignoreMemory
+          ? { omittedReason: "user-disabled" }
+          : !memoryManifest && !memoryEntrypoint
+            ? { omittedReason: "not-found" }
+            : {}
+      ),
+    },
+    {
+      sourceId: "session-instructions",
+      category: "session_instructions",
+      eligibility: "session-scope",
+      content: options.additionalInstructions ?? "",
+      loaded: Boolean(options.additionalInstructions),
+      ...(!options.additionalInstructions ? { omittedReason: "not-provided" } : {}),
+    },
+    {
+      sourceId: "skills",
+      category: "skills",
+      eligibility: "registry-visible",
+      content: skillsReminder,
+      loaded: Boolean(skillsReminder),
+      ...(!skillsReminder ? { omittedReason: "none-visible" } : {}),
+    },
+    {
+      sourceId: "agents",
+      category: "agents",
+      eligibility: "registry-visible",
+      content: agentsReminder,
+      loaded: Boolean(agentsReminder),
+      ...(!agentsReminder ? { omittedReason: "none-visible" } : {}),
+    },
+    {
+      sourceId: "team",
+      category: "team",
+      eligibility: "active-team",
+      content: teamReminder,
+      loaded: Boolean(teamReminder),
+      ...(!teamReminder ? { omittedReason: "inactive" } : {}),
+    },
+    {
+      sourceId: "output-style",
+      category: "output_style",
+      eligibility: "active-style",
+      content: outputStyleSection,
+      loaded: Boolean(outputStyleSection),
+      ...(!outputStyleSection ? { omittedReason: "default" } : {}),
+    },
+    {
+      sourceId: "language",
+      category: "language",
+      eligibility: "configured-language",
+      content: languageSection,
+      loaded: Boolean(languageSection),
+      ...(!languageSection ? { omittedReason: "not-configured" } : {}),
+    },
+  ];
+  const model = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-20250514";
+  return {
+    parts,
+    manifest: buildContextManifest(sourceInputs, {
+      contextWindow: getContextWindowForModel(model),
+      effectiveContextWindow: getEffectiveContextWindowSize(model),
+    }),
+  };
+}
+
+export async function buildSystemPrompt(options: BuildSystemPromptOptions): Promise<string[]> {
+  return (await buildSystemPromptBundle(options)).parts;
 }
 
 export function renderSystemPrompt(parts: string[]): string {

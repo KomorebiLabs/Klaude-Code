@@ -11,10 +11,11 @@ export type DiagnosticStage =
   | "permission"
   | "tool"
   | "context"
+  | "memory"
   | "evaluation";
 
 export interface DiagnosticEvidence {
-  source: "trace" | "evaluation";
+  source: "trace" | "evaluation" | "memory";
   reference: string;
   sequences?: number[];
   spanIds?: string[];
@@ -45,6 +46,18 @@ export interface TraceDiagnosticSummary {
   toolCompletedCount: number;
   toolFailedCount: number;
   compactionCount: number;
+  contextManifestCount: number;
+  contextLoadedSourceCount: number;
+  contextEstimatedTokens: number;
+  contextCategories: string[];
+}
+
+export interface MemoryDiagnosticSummary {
+  status: DiagnosticStatus;
+  activeCount: number;
+  staleCount: number;
+  legacyCount: number;
+  invalidCount: number;
 }
 
 export interface EvaluationDiagnosticSummary {
@@ -61,6 +74,7 @@ export interface DiagnosticReport {
   status: DiagnosticStatus;
   trace: TraceDiagnosticSummary;
   evaluation: EvaluationDiagnosticSummary;
+  memory: MemoryDiagnosticSummary;
   findings: DiagnosticFinding[];
   evidenceGaps: Array<"context_provenance" | "memory_lifecycle" | "subagent_lifecycle">;
 }

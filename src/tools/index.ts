@@ -23,6 +23,7 @@ import { listMcpResourcesTool } from "./listMcpResourcesTool.js";
 import { readMcpResourceTool } from "./readMcpResourceTool.js";
 import { powerShellTool } from "./powerShellTool.js";
 import { memoryWriteTool } from "./memoryWriteTool.js";
+import { memoryDeleteTool } from "./memoryDeleteTool.js";
 import { enterPlanModeTool } from "./enterPlanModeTool.js";
 import { exitPlanModeTool } from "./exitPlanModeTool.js";
 import { todoWriteTool } from "./todoWriteTool.js";
@@ -52,6 +53,7 @@ const BUILTIN_TOOLS: Tool[] = [
   listMcpResourcesTool,
   readMcpResourceTool,
   memoryWriteTool,
+  memoryDeleteTool,
   todoWriteTool,
   taskCreateTool,
   taskUpdateTool,

@@ -175,8 +175,9 @@ status: historical-reference
 ## 当前状态
 
 - PR-00～PR-09：Resume Release R1 已合并并标记为 evidenced。
-- PR-14 / E8 Developer Diagnostics：当前实现阶段，将 R1 Trace/Evaluation 转换为安全解释与恢复指导。
-- PR-14 合并后下一候选为 PR-10 Context Provenance；未经单独授权不得启动。
+- PR-14 / E8 Developer Diagnostics：已完成安全解释、恢复指导与可分享诊断报告。
+- PR-10～PR-11 / E4：当前合并实现阶段，交付 Context Provenance、预算估算、Compaction 保真与 Memory 生命周期治理。
+- 下一候选为 PR-12 Multi-Agent Contract & Worktree Baseline；未经单独授权不得启动。
 - 既有文档的历史归属暂不在本文件更新中强制调整；后续新增文档必须遵守本规则。
 
 > [!warning] 维护底线

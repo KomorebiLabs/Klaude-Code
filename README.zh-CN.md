@@ -277,17 +277,17 @@ docs/
 
 ### E4 —— 上下文、记忆与成本治理
 
-**状态：** R2 Diagnostics v1: present · Context/Memory/Multi-Agent explanations: deferred
+**状态：** Context Provenance + Memory Governance v1: present · 完整 Usage/Cost 与语义检索: deferred
 
 上下文加载、Compaction、Memory、项目指令、会话历史和 Token Budget 已经存在。E4 让它们的信息流和成本行为变得可解释、可测试。
 
 任务：
 
-- 🔧 记录上下文来源及其具备纳入资格的原因；
+- ✅ 记录上下文来源、纳入资格、加载状态和确定性 Token 估算，且不复制正文；
 - 🔧 明确 system prompt、项目指令、memory、会话历史、工具和附件之间的边界；
-- 🔧 评估 compaction 是否保留任务关键约束和决策；
-- 🔧 统一手动和自动 compaction 的语义与失败处理；
-- 🔧 防止 memory 检索受到过期、无关或污染条目的影响；
+- ✅ 以 invariant snapshot 校验 compaction 对用户硬约束和当前任务的保留，遗漏时失败关闭；
+- ✅ 为 Memory 增加来源、revision、过期状态、路径隔离与可恢复删除；
+- ✅ 让 stale/legacy 状态进入治理清单和 Diagnostics，不声称已有语义相关性检索；
 - 🔧 统计 input/output/cache usage 和模型调用成本；
 - 🔧 为长会话、工具输出、文件和图片治理上下文预算；
 - 🔧 从上下文溢出或 compaction 失败中可预测地恢复；
@@ -401,7 +401,7 @@ Enterprise Harness Track
   E1 Trace          Foundation: present   · R1 evidenced
   E2 可靠性         Foundation: inherited · R1 evidenced
   E3 安全           Foundation: inherited · R1 evidenced
-  E4 上下文/记忆    Foundation: inherited · Klaude hardening: deferred
+  E4 上下文/记忆    Foundation: inherited · Governance v1 present
   E5 多 Agent       Foundation: inherited · Klaude hardening: deferred
   E6 Evaluation     Foundation: present   · R1 evidenced
   E7 扩展           Foundation: inherited · Klaude hardening: deferred

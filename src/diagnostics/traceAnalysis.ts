@@ -9,6 +9,12 @@ import type {
 
 const TERMINAL_EVENTS = new Set(["query.finished", "query.failed", "query.aborted"]);
 
+function safeCount(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.floor(value)
+    : 0;
+}
+
 function safeLabel(value: unknown, fallback: string): string {
   if (typeof value !== "string" || value.length === 0) return fallback;
   const redacted = createSafeDiagnosticMessage(value);
@@ -50,6 +56,17 @@ export function analyzeTraceArtifact(input: TraceArtifactReadResult): {
   const toolCompleted = events.filter((event) => event.eventType === "tool.completed");
   const toolFailed = events.filter((event) => event.eventType === "tool.failed");
   const compactions = events.filter((event) => event.eventType === "context.compacted");
+  const contextManifests = events.filter((event) => event.eventType === "context.assembled");
+  const latestContextManifest = contextManifests.at(-1);
+  const contextCategories = Array.isArray(latestContextManifest?.payload.categories)
+    ? latestContextManifest.payload.categories
+        .map((entry) =>
+          entry && typeof entry === "object"
+            ? safeLabel((entry as Record<string, unknown>).category, "unknown")
+            : "unknown",
+        )
+        .filter((value, index, values) => value !== "unknown" && values.indexOf(value) === index)
+    : [];
   const traceDegraded = events.filter((event) => event.eventType === "trace.degraded");
 
   if (input.status === "unavailable" || events.length === 0) {
@@ -69,6 +86,10 @@ export function analyzeTraceArtifact(input: TraceArtifactReadResult): {
         toolCompletedCount: 0,
         toolFailedCount: 0,
         compactionCount: 0,
+        contextManifestCount: 0,
+        contextLoadedSourceCount: 0,
+        contextEstimatedTokens: 0,
+        contextCategories: [],
       },
       findings: incomplete ? [{
         code: "trace.artifact-incomplete",
@@ -225,6 +246,10 @@ export function analyzeTraceArtifact(input: TraceArtifactReadResult): {
       toolCompletedCount: toolCompleted.length,
       toolFailedCount: toolFailed.length,
       compactionCount: compactions.length,
+      contextManifestCount: contextManifests.length,
+      contextLoadedSourceCount: safeCount(latestContextManifest?.payload.loadedSourceCount),
+      contextEstimatedTokens: safeCount(latestContextManifest?.payload.loadedEstimatedTokens),
+      contextCategories,
     },
     findings,
   };

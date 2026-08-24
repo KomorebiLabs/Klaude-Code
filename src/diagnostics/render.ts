@@ -14,6 +14,7 @@ export function formatDiagnosticReport(report: DiagnosticReport): string {
     evaluation.reference
       ? `- Evaluation: ${evaluation.outcome} (${evaluation.reference}; assertions ${evaluation.assertionCount})`
       : "- Evaluation: unavailable",
+    `- Memory: ${report.memory.status} (active ${report.memory.activeCount}; stale ${report.memory.staleCount}; legacy ${report.memory.legacyCount}; invalid ${report.memory.invalidCount})`,
   ];
 
   if (trace.reference) {
@@ -21,7 +22,7 @@ export function formatDiagnosticReport(report: DiagnosticReport): string {
       `- Lifecycle: terminal ${trace.terminalEvent ?? "missing"}; retries ${trace.retryCount}; restarts ${trace.restartCount}`,
       `- Permission: allow ${trace.permissionAllowCount}; deny ${trace.permissionDenyCount}; sources ${trace.permissionDecisionSources.join(", ") || "none"}`,
       `- Tools: started ${trace.toolStartedCount}; completed ${trace.toolCompletedCount}; failed ${trace.toolFailedCount}`,
-      `- Context: compactions ${trace.compactionCount}`,
+      `- Context: compactions ${trace.compactionCount}; manifests ${trace.contextManifestCount}; sources ${trace.contextLoadedSourceCount}; estimated tokens ${trace.contextEstimatedTokens}`,
     );
   }
 
@@ -36,11 +37,9 @@ export function formatDiagnosticReport(report: DiagnosticReport): string {
       );
     }
   }
-  lines.push(
-    "",
-    "Evidence gaps",
-    "- Context provenance, memory lifecycle, and sub-agent lifecycle require later R2 instrumentation.",
-  );
+  lines.push("", "Evidence gaps");
+  if (report.evidenceGaps.length === 0) lines.push("- None in the implemented diagnostic domains.");
+  else lines.push(`- ${report.evidenceGaps.join(", ")}`);
   return lines.join("\n");
 }
 

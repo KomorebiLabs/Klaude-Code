@@ -28,6 +28,7 @@ interface MemoryTarget {
   path: string;
   exists: boolean;
   size: number;
+  governance?: string;
 }
 
 /**
@@ -82,7 +83,13 @@ export async function collectMemoryTargets(cwd: string): Promise<MemoryTarget[]>
       const headers = await loadMemoryHeaders(cwd).catch(() => []);
       for (const h of headers) {
         const s = await stat(h.filePath);
-        targets.push({ label: `memory: ${h.title}`, path: h.filePath, ...s });
+        const revision = h.revision ? ` revision=${h.revision}` : "";
+        targets.push({
+          label: `memory: ${h.title}`,
+          path: h.filePath,
+          ...s,
+          governance: `${h.freshness} source=${h.source}${revision}`,
+        });
       }
     }
   } catch {
@@ -161,7 +168,7 @@ export async function* handleMemoryCommand(
         const shown = rel && !rel.startsWith("..") ? rel : t.path;
         const meta = t.exists ? formatSize(t.size) : "missing";
         lines.push(`  ${i + 1}. ${t.label}`);
-        lines.push(`     ${shown}  (${meta})`);
+        lines.push(`     ${shown}  (${meta}${t.governance ? `; ${t.governance}` : ""})`);
       });
     }
     lines.push(

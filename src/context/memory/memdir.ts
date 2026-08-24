@@ -2,8 +2,14 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { MemoryEntry, MemoryFrontmatter, MemoryType } from "./memoryTypes.js";
-import { isMemoryType } from "./memoryTypes.js";
 import { getProjectsRoot } from "../../utils/paths.js";
+import {
+  archiveGovernedMemory,
+  parseGovernedMemory,
+  writeGovernedMemory,
+  type MemoryFreshness,
+  type MemorySource,
+} from "./governance.js";
 
 export const MEMORY_ENTRYPOINT = "MEMORY.md";
 export const MAX_ENTRYPOINT_LINES = 200;
@@ -13,12 +19,22 @@ export interface MemoryDocument extends MemoryEntry {
   frontmatter: MemoryFrontmatter;
   body: string;
   relativePath: string;
+  schemaVersion: 1 | 2;
+  source: MemorySource | "unknown";
+  freshness: MemoryFreshness;
+  revision?: string;
+  expiresAt?: string;
 }
 
 
 export interface MemoryHeader extends MemoryEntry {
   frontmatter: MemoryFrontmatter;
   relativePath: string;
+  schemaVersion: 1 | 2;
+  source: MemorySource | "unknown";
+  freshness: MemoryFreshness;
+  revision?: string;
+  expiresAt?: string;
 }
 
 export interface ProjectPathInfo {
@@ -91,35 +107,6 @@ export async function ensureMemoryDirExists(cwd: string): Promise<string> {
   return memoryDir;
 }
 
-function parseFrontmatter(raw: string): MemoryFrontmatter | null {
-  const match = raw.match(/^---\n([\s\S]*?)\n---\n?/);
-  if (!match) return null;
-
-  const fields = new Map<string, string>();
-  for (const line of match[1].split(/\r?\n/)) {
-    const idx = line.indexOf(":");
-    if (idx === -1) continue;
-    fields.set(line.slice(0, idx).trim(), line.slice(idx + 1).trim());
-  }
-
-  const name = fields.get("name");
-  const description = fields.get("description");
-  const type = fields.get("type");
-  if (!name || !description || !type || !isMemoryType(type)) {
-    return null;
-  }
-
-  return {
-    name: normalizeLine(name),
-    description: normalizeLine(description),
-    type,
-  };
-}
-
-function stripFrontmatter(raw: string): string {
-  return raw.replace(/^---\n[\s\S]*?\n---\n?/, "").trim();
-}
-
 function truncateEntrypoint(raw: string): { content: string; warning?: string } {
   let content = raw;
   let lineTruncated = false;
@@ -165,10 +152,11 @@ export async function readMemoryEntrypoint(cwd: string): Promise<string | null> 
   return [truncated.content, truncated.warning].filter(Boolean).join("\n\n") || null;
 }
 
-async function collectMemoryMarkdownFiles(memoryDir: string, currentDir = memoryDir): Promise<string[]> {
+export async function collectMemoryMarkdownFiles(memoryDir: string, currentDir = memoryDir): Promise<string[]> {
   const dirents = await fs.readdir(currentDir, { withFileTypes: true });
   const nested = await Promise.all(
     dirents.map(async (entry) => {
+      if (entry.name === ".trash") return [];
       const fullPath = path.join(currentDir, entry.name);
       if (entry.isDirectory()) {
         return collectMemoryMarkdownFiles(memoryDir, fullPath);
@@ -189,9 +177,21 @@ export async function loadMemoryHeaders(cwd: string): Promise<MemoryHeader[]> {
   const headers = await Promise.all(
     relativePaths.map(async (relativePath) => {
       const filePath = path.join(memoryDir, relativePath);
-      const raw = await fs.readFile(filePath, "utf-8");
-      const frontmatter = parseFrontmatter(raw);
-      if (!frontmatter) return null;
+      let raw: string;
+      try {
+        raw = await fs.readFile(filePath, "utf-8");
+      } catch {
+        // Memory metadata is advisory context. A raced deletion or unreadable
+        // file must not turn prompt construction into a Query failure.
+        return null;
+      }
+      const governed = parseGovernedMemory(raw);
+      if (!governed) return null;
+      const frontmatter: MemoryFrontmatter = {
+        name: governed.name,
+        description: governed.description,
+        type: governed.type,
+      };
       return {
         fileName: relativePath,
         relativePath,
@@ -199,6 +199,11 @@ export async function loadMemoryHeaders(cwd: string): Promise<MemoryHeader[]> {
         title: frontmatter.name,
         hook: frontmatter.description,
         frontmatter,
+        schemaVersion: governed.schemaVersion,
+        source: governed.source,
+        freshness: governed.freshness,
+        ...(governed.revision ? { revision: governed.revision } : {}),
+        ...(governed.expiresAt ? { expiresAt: governed.expiresAt } : {}),
       } satisfies MemoryHeader;
     }),
   );
@@ -210,7 +215,15 @@ export async function loadMemoryHeaders(cwd: string): Promise<MemoryHeader[]> {
 
 export function formatMemoryManifest(headers: readonly MemoryHeader[]): string {
   return headers
-    .map((header) => `- [${header.frontmatter.type}] ${header.relativePath}: ${header.title} — ${header.hook}`)
+    .map((header) => {
+      const governance = [
+        `status=${header.freshness}`,
+        `source=${header.source}`,
+        header.revision ? `revision=${header.revision}` : "",
+        header.expiresAt ? `expires=${header.expiresAt}` : "",
+      ].filter(Boolean).join(", ");
+      return `- [${header.frontmatter.type}] ${header.relativePath}: ${header.title} — ${header.hook} (${governance})`;
+    })
     .join("\n");
 }
 
@@ -221,8 +234,13 @@ export async function loadMemoryDocumentBodies(cwd: string, relativePaths: reado
     uniquePaths.map(async (relativePath) => {
       const filePath = path.join(memoryDir, relativePath);
       const raw = await fs.readFile(filePath, "utf-8");
-      const frontmatter = parseFrontmatter(raw);
-      if (!frontmatter) return null;
+      const governed = parseGovernedMemory(raw);
+      if (!governed) return null;
+      const frontmatter: MemoryFrontmatter = {
+        name: governed.name,
+        description: governed.description,
+        type: governed.type,
+      };
       return {
         fileName: relativePath,
         relativePath,
@@ -230,7 +248,12 @@ export async function loadMemoryDocumentBodies(cwd: string, relativePaths: reado
         title: frontmatter.name,
         hook: frontmatter.description,
         frontmatter,
-        body: stripFrontmatter(raw),
+        body: governed.body,
+        schemaVersion: governed.schemaVersion,
+        source: governed.source,
+        freshness: governed.freshness,
+        ...(governed.revision ? { revision: governed.revision } : {}),
+        ...(governed.expiresAt ? { expiresAt: governed.expiresAt } : {}),
       } satisfies MemoryDocument;
     }),
   );
@@ -257,7 +280,16 @@ async function rewriteEntrypoint(memoryDir: string, entries: MemoryEntry[]): Pro
   const bodyLines = ["# Project Memory", "", ...[...unique.values()]];
   const truncated = truncateEntrypoint(bodyLines.join("\n"));
   const finalText = [truncated.content, truncated.warning].filter(Boolean).join("\n\n") + "\n";
-  await fs.writeFile(entrypointPath, finalText, "utf-8");
+  const temporaryPath = path.join(
+    memoryDir,
+    `.MEMORY-${process.pid}-${crypto.randomUUID()}.tmp`,
+  );
+  try {
+    await fs.writeFile(temporaryPath, finalText, "utf-8");
+    await fs.rename(temporaryPath, entrypointPath);
+  } finally {
+    await fs.rm(temporaryPath, { force: true });
+  }
 }
 
 async function findExistingMemoryFile(cwd: string, name: string, description: string): Promise<string | null> {
@@ -283,33 +315,54 @@ export async function writeProjectMemory(input: {
   type: MemoryType;
   content: string;
   fileName?: string;
-}): Promise<{ filePath: string; fileName: string; updatedExisting: boolean }> {
+  source?: MemorySource;
+  expectedRevision?: string;
+  expiresAt?: string;
+}): Promise<{ filePath: string; fileName: string; revision: string; updatedExisting: boolean }> {
   const memoryDir = await ensureMemoryDirExists(input.cwd);
   const existingFileName = input.fileName ?? (await findExistingMemoryFile(input.cwd, input.name, input.description));
   const fileName = existingFileName ?? slugifyMemoryFileName(input.name);
-  const filePath = path.join(memoryDir, fileName);
-
-  const body = [
-    "---",
-    `name: ${normalizeLine(input.name)}`,
-    `description: ${normalizeLine(input.description)}`,
-    `type: ${input.type}`,
-    "---",
-    "",
-    input.content.trim(),
-    "",
-  ].join("\n");
-
-  await fs.writeFile(filePath, body, "utf-8");
+  const result = await writeGovernedMemory({
+    memoryDir,
+    fileName,
+    name: input.name,
+    description: input.description,
+    type: input.type,
+    source: input.source ?? "inference",
+    content: input.content,
+    ...(input.expectedRevision ? { expectedRevision: input.expectedRevision } : {}),
+    ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
+  });
   const docs = await listMemoryFiles(input.cwd);
-  await rewriteEntrypoint(memoryDir, docs.map((doc) => ({
+  await rewriteEntrypoint(memoryDir, docs.filter((doc) => doc.freshness !== "stale").map((doc) => ({
     fileName: doc.fileName,
     filePath: doc.filePath,
     title: doc.frontmatter.name,
     hook: doc.frontmatter.description,
   })));
 
-  return { filePath, fileName, updatedExisting: Boolean(existingFileName) };
+  return result;
+}
+
+export async function archiveProjectMemory(input: {
+  cwd: string;
+  fileName: string;
+  expectedRevision: string;
+}): Promise<{ archivePath: string; revision: string }> {
+  const memoryDir = await ensureMemoryDirExists(input.cwd);
+  const result = await archiveGovernedMemory({
+    memoryDir,
+    fileName: input.fileName,
+    expectedRevision: input.expectedRevision,
+  });
+  const docs = await listMemoryFiles(input.cwd);
+  await rewriteEntrypoint(memoryDir, docs.filter((doc) => doc.freshness !== "stale").map((doc) => ({
+    fileName: doc.fileName,
+    filePath: doc.filePath,
+    title: doc.frontmatter.name,
+    hook: doc.frontmatter.description,
+  })));
+  return result;
 }
 
 export function shouldIgnoreMemory(query: string): boolean {
@@ -321,10 +374,15 @@ export function buildMemoryPromptInstructions(): string[] {
   return [
     "Use memory only for information that will be useful in future conversations and cannot be derived directly from the current repo state.",
     "Supported memory types: user, feedback, project, reference.",
-    "When saving a memory, write one markdown file with frontmatter: name, description, type.",
+    "Use MemoryWrite with an explicit source: user, project, external, or inference.",
+    "New memories receive schema, created_at, updated_at, and revision metadata automatically.",
+    "Before updating an existing memory, re-read it and pass its current revision as expected_revision; conflicts must not be overwritten silently.",
+    "An optional expires_at ISO timestamp marks when a memory becomes stale. Stale memory may be inspected but must not be treated as current fact.",
+    "Use MemoryDelete with file_name and expected_revision for recoverable deletion; it archives the file under .trash.",
     `After writing or updating a memory file, update ${MEMORY_ENTRYPOINT} with a one-line pointer in the form: - [Title](file.md) — one-line hook.`,
     `${MEMORY_ENTRYPOINT} is an index, not a place to store full memory content.`,
     `Keep ${MEMORY_ENTRYPOINT} under ${MAX_ENTRYPOINT_LINES} lines and ${MAX_ENTRYPOINT_BYTES} bytes.`,
     "Before creating a new memory, inspect existing topic memory files and update the best match when possible.",
+    "Legacy memories remain readable but have unknown provenance and freshness until explicitly rewritten.",
   ];
 }
