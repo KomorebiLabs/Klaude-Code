@@ -49,7 +49,7 @@ Klaude-Code 当前包含两条相互连接、但性质不同的路线：
 
 当前实现已经包含终端 CLI、流式模型通信、本地工具、权限、Sandbox、会话、上下文管理、MCP、Skills、Sub-Agent、后台执行、Agent Teams、Hooks、多 Provider、多模态输入以及 Extended Thinking 控制等能力。
 
-第一条企业级 Harness Slice 也已经完成：Trace 契约与脱敏、本地弹性 JSONL 存储，以及 QueryEngine 层面的 `query.started` / `query.finished` / `query.failed` / `query.aborted` 事件。模型 attempt Trace、工具/权限 Trace 和 Evaluation 门禁仍属于后续的加固与计划工作。
+第一条企业级 Harness 核心因果链已经完成：Trace 契约与脱敏、本地弹性 JSONL 存储，以及 Query、Model Attempt、API Retry、Stream Restart、Tool、Permission 的真实边界事件。最小 Inspector 可按 sequence 安全读取单份 Trace；Evaluation 门禁与更完整的可靠性、安全状态机仍属于后续加固。
 
 当前运行时仍然保留从原始实现继承而来的兼容标识，包括 npm package 名称 `easy-agent` 和可执行命令 `agent`。完整的 package、CLI、配置和用户数据迁移被有意放在后续 E9 兼容性项目中；本次 README 品牌重定位不声称这项迁移已经完成。
 
@@ -205,7 +205,7 @@ Enterprise Harness Track 并不是再次声称基础功能不存在，而是新�
 
 **状态：** Foundation: present · Klaude hardening: in-progress
 
-Task 1–3 已经建立了第一条本地结构化 Trace Slice。E1 的后续工作是把现有模型、重试、工具和权限边界接入同一个证据模型，而不是重新实现这些运行时能力。
+Task 1–5 已经建立本地结构化 Trace 核心因果链，并把现有模型、重试、工具和权限边界接入同一个证据模型；这些改动观测继承运行时能力，而不是重新实现它们。
 
 任务：
 

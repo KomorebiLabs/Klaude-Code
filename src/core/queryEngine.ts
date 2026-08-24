@@ -719,6 +719,7 @@ export class QueryEngine {
         permissionSettings: this.permissionSettings,
         sessionPermissionRules: this.sessionPermissionRules,
         onPermissionRequest: this.onPermissionRequest,
+        traceSink: traceWriter,
       });
 
       while (true) {
