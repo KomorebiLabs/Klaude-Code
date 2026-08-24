@@ -34,7 +34,28 @@ export type APIErrorCategory =
   | "api_timeout" // request timed out
   | "connection_error" // network unreachable / reset
   | "aborted" // user/Abort cancelled
+  | "provider_protocol" // malformed or unexpected provider response
   | "unknown";
+
+export type HarnessErrorKind =
+  | "transient"
+  | "permanent"
+  | "rate_limited"
+  | "provider_protocol";
+
+export interface HarnessErrorClassification {
+  kind: HarnessErrorKind;
+  category: APIErrorCategory;
+  retryable: boolean;
+}
+
+/** A provider returned a successful response that violates its stream contract. */
+export class ProviderProtocolError extends Error {
+  constructor() {
+    super("The provider returned a response that did not match the expected streaming protocol.");
+    this.name = "ProviderProtocolError";
+  }
+}
 
 // ─── User-facing message constants ─────────────────────────────────
 
@@ -121,6 +142,7 @@ export function getRetryAfterMs(error: unknown): number | null {
  * the categories Easy Agent can actually act on.
  */
 export function classifyAPIError(error: unknown): APIErrorCategory {
+  if (error instanceof ProviderProtocolError) return "provider_protocol";
   if (error instanceof Error && error.name === "AbortError") return "aborted";
   if (
     error instanceof Error &&
@@ -169,6 +191,24 @@ export function classifyAPIError(error: unknown): APIErrorCategory {
   if (error instanceof APIConnectionError) return "connection_error";
 
   return "unknown";
+}
+
+/** Stable, provider-neutral classification used by Harness policy and traces. */
+export function classifyHarnessError(error: unknown): HarnessErrorClassification {
+  const category = classifyAPIError(error);
+  switch (category) {
+    case "rate_limit":
+      return { kind: "rate_limited", category, retryable: true };
+    case "server_overload":
+    case "server_error":
+    case "api_timeout":
+    case "connection_error":
+      return { kind: "transient", category, retryable: true };
+    case "provider_protocol":
+      return { kind: "provider_protocol", category, retryable: false };
+    default:
+      return { kind: "permanent", category, retryable: false };
+  }
 }
 
 /**
@@ -231,6 +271,8 @@ export function getUserFacingErrorMessage(
       return `${API_ERROR_MESSAGE_PREFIX}: The model${model ? ` "${model}"` : ""} was not found or is not accessible. Use /model to pick a different one.`;
     case "connection_error":
       return `${API_ERROR_MESSAGE_PREFIX}: Could not reach the API (network error). Check your connection${process.env.ANTHROPIC_BASE_URL ? ` and ANTHROPIC_BASE_URL (${process.env.ANTHROPIC_BASE_URL})` : ""}.`;
+    case "provider_protocol":
+      return `${API_ERROR_MESSAGE_PREFIX}: The provider returned an invalid streaming response. Check the selected protocol and base URL.`;
     case "aborted":
       return rawMessage;
     default:

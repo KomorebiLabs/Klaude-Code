@@ -145,6 +145,10 @@ export interface StreamRetryEvent {
   attempt: number;
   maxRetries: number;
   delayMs: number;
+  /** Present on retry events produced by the budget-aware API layer. */
+  reason?: "scheduled";
+  spentDelayMs?: number;
+  remainingDelayMs?: number;
   errorMessage: string;
   category: string;
 }
