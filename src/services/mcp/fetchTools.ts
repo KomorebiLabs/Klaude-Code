@@ -28,41 +28,22 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { ConnectedMcpServer } from "../../types/mcp.js";
 import type { Tool, ToolContext, ToolResult } from "../../tools/Tool.js";
+import { createSafeMessage } from "../../observability/redaction.js";
 import { debugLog, logWarn } from "../../utils/log.js";
 import { buildMcpToolName } from "./mcpStringUtils.js";
+import { normalizeNameForMCP } from "./normalization.js";
+import {
+  classifyMcpFailure,
+  createSafeMcpFailure,
+  createMcpRequestOptions,
+  stringifyMcpContentBounded,
+} from "./safety.js";
 
 /**
  * MCP tool descriptions can blow up to 60 KB on OpenAPI-derived servers.
  * Cap at 2048 chars to keep the system prompt sane (same value as source).
  */
 const MAX_MCP_DESCRIPTION_LENGTH = 2048;
-
-/** Map MCP `CallToolResult.content[]` blocks to a single string for our Tool result. */
-function stringifyMcpContent(content: CallToolResult["content"]): string {
-  if (!Array.isArray(content)) return "";
-  const parts: string[] = [];
-  for (const block of content) {
-    switch (block.type) {
-      case "text":
-        parts.push(block.text);
-        break;
-      case "image":
-        // Source code resizes + persists the image to disk and returns a
-        // path. For Stage 16 we just acknowledge it — image-aware tools
-        // can be added later when we wire MCP into the model's vision input.
-        parts.push(`[image: ${block.mimeType ?? "?"}, ${(block.data ?? "").length} base64 chars]`);
-        break;
-      case "resource": {
-        const r = block.resource as { uri?: string; text?: string };
-        parts.push(r?.text ?? `[resource: ${r?.uri ?? "<no uri>"}]`);
-        break;
-      }
-      default:
-        parts.push(`[${(block as { type?: string }).type ?? "unknown"} block]`);
-    }
-  }
-  return parts.join("\n");
-}
 
 function truncateDescription(desc: string | undefined): string {
   if (!desc) return "";
@@ -79,7 +60,10 @@ function truncateDescription(desc: string | undefined): string {
  *   tool.inputSchema               → inputSchema        (passed through to API)
  *   tool.description (≤2048 chars) → description
  */
-function buildToolAdapter(connection: ConnectedMcpServer, mcpTool: McpTool): Tool {
+export function buildToolAdapter(
+  connection: ConnectedMcpServer,
+  mcpTool: McpTool,
+): Tool {
   const fullName = buildMcpToolName(connection.name, mcpTool.name);
   const description = truncateDescription(mcpTool.description);
   const isReadOnly = mcpTool.annotations?.readOnlyHint ?? false;
@@ -94,11 +78,16 @@ function buildToolAdapter(connection: ConnectedMcpServer, mcpTool: McpTool): Too
 
   return {
     name: fullName,
+    externalSource: {
+      kind: "mcp",
+      sourceName: normalizeNameForMCP(connection.name),
+      operationName: normalizeNameForMCP(mcpTool.name),
+    },
     description,
     inputSchema,
     isReadOnly: () => isReadOnly,
     isEnabled: () => true,
-    async call(rawInput: Record<string, unknown>, _context: ToolContext): Promise<ToolResult> {
+    async call(rawInput: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
       try {
         const result = await connection.client.request(
           {
@@ -109,17 +98,30 @@ function buildToolAdapter(connection: ConnectedMcpServer, mcpTool: McpTool): Too
             },
           },
           CallToolResultSchema,
+          createMcpRequestOptions(context.abortSignal),
         );
-        const content = stringifyMcpContent(result.content as CallToolResult["content"]);
+        const content = stringifyMcpContentBounded(
+          result.content as CallToolResult["content"],
+        );
         return {
           content,
           isError: result.isError === true,
+          diagnostics: { termination: "completed" },
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const category = classifyMcpFailure(error, context.abortSignal);
         return {
-          content: `MCP tool '${fullName}' failed: ${message}`,
+          content: createSafeMcpFailure(
+            `MCP tool '${fullName}'`,
+            error,
+            context.abortSignal,
+          ),
           isError: true,
+          ...(category === "mcp_timeout"
+            ? { diagnostics: { termination: "timeout" as const } }
+            : category === "mcp_aborted"
+              ? { diagnostics: { termination: "aborted" as const } }
+              : {}),
         };
       }
     },
@@ -144,9 +146,10 @@ export async function fetchToolsForConnection(
     result = (await connection.client.request(
       { method: "tools/list" },
       ListToolsResultSchema,
+      createMcpRequestOptions(),
     )) as ListToolsResult;
   } catch (error) {
-    logWarn(`MCP server '${connection.name}' tools/list failed: ${(error as Error).message}`);
+    logWarn(`MCP server '${connection.name}' tools/list failed: ${createSafeMessage(error)}`);
     return [];
   }
 
@@ -156,7 +159,7 @@ export async function fetchToolsForConnection(
       tools.push(buildToolAdapter(connection, mcpTool));
     } catch (error) {
       logWarn(
-        `MCP tool '${connection.name}.${mcpTool.name}' failed schema adaptation: ${(error as Error).message}`,
+        `MCP tool '${connection.name}.${mcpTool.name}' failed schema adaptation: ${createSafeMessage(error)}`,
       );
     }
   }

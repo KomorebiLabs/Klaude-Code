@@ -742,7 +742,12 @@ async function runOneToolBlock(
     emitTrace(
       options.traceSink,
       "tool.started",
-      createToolStartedPayload({ toolName: block.name, toolUseId: block.id, toolInput }),
+      createToolStartedPayload({
+        toolName: block.name,
+        toolUseId: block.id,
+        toolInput,
+        externalSource: tool.externalSource,
+      }),
       toolSpanId,
     );
     const rawResult = await tool.call(toolInput, callContext);
@@ -760,6 +765,7 @@ async function runOneToolBlock(
           toolUseId: block.id,
           result,
           durationMs: performance.now() - toolStartedAt,
+          externalSource: tool.externalSource,
         }),
         toolSpanId,
       );
@@ -827,6 +833,7 @@ async function runOneToolBlock(
         toolUseId: block.id,
         result,
         durationMs: performance.now() - toolStartedAt,
+        externalSource: tool.externalSource,
       }),
       toolSpanId,
     );
@@ -845,6 +852,7 @@ async function runOneToolBlock(
           toolUseId: block.id,
           error,
           durationMs: performance.now() - toolStartedAt,
+          externalSource: tool.externalSource,
         }),
         toolSpanId,
       );

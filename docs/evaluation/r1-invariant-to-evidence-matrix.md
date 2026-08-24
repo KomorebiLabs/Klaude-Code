@@ -1,4 +1,4 @@
-# R1 Invariant-to-Evidence Matrix（PR-07 基线）
+# R1 Invariant-to-Evidence Matrix（PR-08 基线）
 
 | Invariant ID | R1 承诺 | 确定性命令 | 证据文件 |
 |---|---|---|---|
@@ -20,5 +20,12 @@
 | `stream.partial-output-no-restart` | Partial Stream 后既不 replay API attempt，也不触发 Reactive Compact/restart | `npm run test:resilience && npm run test:recovery-lifecycle` | `src/scripts/smoke-resilience.ts`, `src/scripts/test-recovery-lifecycle.ts` |
 | `context.single-reactive-recovery` | Prompt-too-long 仅可在零输出时执行一次 Compact + Restart，重复溢出有界失败 | `npm run test:recovery-lifecycle` | `src/scripts/test-recovery-lifecycle.ts` |
 | `trace.single-terminal-event` | completed/blocking/max-turns、aborted、timeout/model-error 映射到唯一且匹配的 Query 终止事件 | `npm run test:trace && npm run test:recovery-lifecycle` | `src/scripts/test-trace.ts`, `src/scripts/test-recovery-lifecycle.ts` |
+| `filesystem.canonical-containment` | 文件 Tool 按真实路径与最近存在祖先校验，工作区内 symlink/junction 不能逃逸允许根 | `npm run test:external-safety` | `src/scripts/test-external-safety-contract.ts`, `src/tools/pathUtils.ts` |
+| `sandbox.permission-no-upgrade` | Sandbox 可用性和包装决策不改变 PR-07 的 deny/ask 授权结果；不支持平台显式降级 | `npm run test:external-safety && npm run test:tool-permission-contract && npm run test:sandbox` | `src/scripts/test-external-safety-contract.ts`, `src/scripts/test-tool-permission-contract.ts` |
+| `process.timeout-bounded-cleanup` | Bash/PowerShell timeout 有上下界、采集内存有界，并在确认终止或固定 deadline 降级后结算 | `npm run test:external-safety && npm run test:recovery-lifecycle` | `src/scripts/test-external-safety-contract.ts`, `src/tools/processLifecycle.ts` |
+| `mcp.permission-deny-no-request` | 真实 MCP adapter 被显式 deny 时 transport request 调用计数为 0 | `npm run test:external-safety && npm run test:tool-permission-contract` | `src/scripts/test-external-safety-contract.ts`, `src/services/mcp/fetchTools.ts` |
+| `mcp.timeout-failure-isolation` | MCP 调用显式绑定 AbortSignal、30 秒总预算和 100K 内容预算，单连接失败不破坏其他连接 | `npm run test:external-safety && npm run test:mcp` | `src/scripts/test-external-safety-contract.ts`, `src/services/mcp/safety.ts` |
+| `diagnostics.fake-secret-absent` | fake Secret、Bearer、URL credentials/query 与 private-key body 不进入 Log、Doctor、Trace、Evaluation | `npm run test:external-safety && npm run test:trace && npm run test:evaluation` | `src/scripts/test-external-safety-contract.ts`, `src/observability/redaction.ts` |
+| `external.trace-allowlist` | MCP/本地进程 Trace 仅记录规范来源、操作、终止与 Sandbox 枚举，不记录输入、命令或输出正文 | `npm run test:external-safety && npm run test:trace` | `src/scripts/test-external-safety-contract.ts`, `src/observability/toolLifecycle.ts` |
 
-统一门禁：`npm run verify:core`。本矩阵覆盖 PR-04 基础、PR-05～PR-06 可靠性承诺以及 PR-07 Tool/Permission 安全契约；PR-08 新承诺必须增量加入，不用测试数量或覆盖率替代证据映射。
+统一门禁：`npm run verify:core`。本矩阵覆盖 PR-04 基础、PR-05～PR-06 可靠性、PR-07 Tool/Permission 安全契约以及 PR-08 外部执行安全边界；PR-09 只消费这些可复现证据做 R1 闭环，不用测试数量或覆盖率替代证据映射。

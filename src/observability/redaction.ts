@@ -11,6 +11,7 @@ const MAX_SAFE_MESSAGE_LENGTH = 500;
 
 function redactString(value: string): string {
   return value
+    .replace(/([a-z][a-z0-9+.-]*:\/\/)[^/@\s]+@/gi, "$1[REDACTED]@")
     .replace(/Bearer\s+[^\s]+/gi, "Bearer [REDACTED]")
     .replace(AUTHORIZATION_ASSIGNMENT, "$1=[REDACTED]")
     .replace(SENSITIVE_VALUE_ASSIGNMENT, "$1=[REDACTED]")
@@ -50,8 +51,31 @@ export function redactForTrace(value: unknown, key?: string): unknown {
 }
 
 export function createSafeMessage(value: unknown): string {
-  const raw = typeof value === "string" ? value : value instanceof Error ? value.message : "Trace operation failed";
-  return redactString(raw).slice(0, MAX_SAFE_MESSAGE_LENGTH);
+  return createSafeDiagnosticMessage(value);
+}
+
+export function createSafeDiagnosticMessage(value: unknown): string {
+  try {
+    const raw = typeof value === "string"
+      ? value
+      : value instanceof Error
+        ? value.message
+        : "Diagnostic detail omitted.";
+    return redactString(raw).slice(0, MAX_SAFE_MESSAGE_LENGTH);
+  } catch {
+    return "Diagnostic detail omitted.";
+  }
+}
+
+/** Return only the non-secret network origin; omit credentials, path and query. */
+export function createSafeUrlSummary(value: string): string {
+  try {
+    const parsed = new URL(value);
+    if (!parsed.protocol || !parsed.host) return "[invalid-url]";
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return "[invalid-url]";
+  }
 }
 
 export function summarizeToolInput(input: Record<string, unknown>): ToolInputSummary {

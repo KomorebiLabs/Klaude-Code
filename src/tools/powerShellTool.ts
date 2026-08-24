@@ -1,6 +1,10 @@
-import { spawn } from "node:child_process";
 import type { Tool, ToolContext, ToolResult } from "./Tool.js";
+import {
+  normalizeToolTimeout,
+  runManagedProcess,
+} from "./processLifecycle.js";
 import { readMergedEnv } from "../utils/settings.js";
+import { createSafeDiagnosticMessage } from "../observability/redaction.js";
 
 /**
  * PowerShell — execute a PowerShell command on Windows.
@@ -17,14 +21,6 @@ interface PowerShellInput {
   timeout?: number;
 }
 
-const DEFAULT_TIMEOUT_MS = 120_000;
-const MAX_OUTPUT_CHARS = 30_000;
-
-function truncateOutput(value: string): string {
-  if (value.length <= MAX_OUTPUT_CHARS) return value;
-  return `${value.slice(0, MAX_OUTPUT_CHARS)}\n...[truncated ${value.length - MAX_OUTPUT_CHARS} chars]`;
-}
-
 function resolveExecutable(): string {
   // pwsh (PowerShell 7+) if explicitly requested; default to Windows PowerShell.
   return process.env.EASY_AGENT_POWERSHELL || "powershell.exe";
@@ -32,6 +28,11 @@ function resolveExecutable(): string {
 
 export const powerShellTool: Tool = {
   name: "PowerShell",
+  externalSource: {
+    kind: "process",
+    sourceName: "local",
+    operationName: "powershell",
+  },
   description:
     "Execute a PowerShell command on Windows and return stdout/stderr. Use this instead of Bash on Windows. Note: not sandboxed.",
   inputSchema: {
@@ -47,7 +48,7 @@ export const powerShellTool: Tool = {
     if (!input.command) {
       return { content: "Error: command is required", isError: true };
     }
-    const timeoutMs = typeof input.timeout === "number" ? input.timeout : DEFAULT_TIMEOUT_MS;
+    const timeoutMs = normalizeToolTimeout(input.timeout);
 
     let settingsEnv: Record<string, string> = {};
     try {
@@ -56,57 +57,54 @@ export const powerShellTool: Tool = {
       settingsEnv = {};
     }
 
-    const exe = resolveExecutable();
-    return await new Promise<ToolResult>((resolve) => {
-      const child = spawn(
-        exe,
-        ["-NoProfile", "-NonInteractive", "-Command", input.command],
-        { cwd: context.cwd, env: { ...process.env, ...settingsEnv } },
-      );
-
-      let stdout = "";
-      let stderr = "";
-      let settled = false;
-      const finish = (result: ToolResult) => {
-        if (settled) return;
-        settled = true;
-        resolve(result);
-      };
-
-      const timeoutId = setTimeout(() => {
-        child.kill();
-        finish({ content: `Command timed out after ${timeoutMs}ms`, isError: true });
-      }, timeoutMs);
-
-      const onAbort = () => {
-        child.kill();
-        clearTimeout(timeoutId);
-        finish({ content: "Command aborted", isError: true });
-      };
-      context.abortSignal?.addEventListener("abort", onAbort, { once: true });
-
-      child.stdout.on("data", (c: Buffer | string) => {
-        stdout += c.toString();
-      });
-      child.stderr.on("data", (c: Buffer | string) => {
-        stderr += c.toString();
-      });
-      child.on("error", (error) => {
-        clearTimeout(timeoutId);
-        finish({ content: `Failed to start PowerShell: ${error.message}`, isError: true });
-      });
-      child.on("close", (code) => {
-        clearTimeout(timeoutId);
-        context.abortSignal?.removeEventListener("abort", onAbort);
-        const output = [
-          `Command: ${input.command}`,
-          `Exit code: ${code ?? -1}`,
-          stdout ? `\nSTDOUT:\n${truncateOutput(stdout)}` : "",
-          stderr ? `\nSTDERR:\n${truncateOutput(stderr)}` : "",
-        ].filter(Boolean).join("\n");
-        finish({ content: output, isError: (code ?? 1) !== 0 });
-      });
+    const execution = await runManagedProcess({
+      executable: resolveExecutable(),
+      args: ["-NoProfile", "-NonInteractive", "-Command", input.command],
+      cwd: context.cwd,
+      env: { ...process.env, ...settingsEnv },
+      timeoutMs,
+      abortSignal: context.abortSignal,
     });
+
+    if (execution.status === "timeout") {
+      return {
+        content: `Command timed out after ${timeoutMs}ms (termination: ${execution.termination})`,
+        isError: true,
+        diagnostics: {
+          termination: execution.termination === "degraded" ? "degraded" : "timeout",
+          sandboxState: "unsupported",
+        },
+      };
+    }
+    if (execution.status === "aborted") {
+      return {
+        content: `Command aborted (termination: ${execution.termination})`,
+        isError: true,
+        diagnostics: {
+          termination: execution.termination === "degraded" ? "degraded" : "aborted",
+          sandboxState: "unsupported",
+        },
+      };
+    }
+    if (execution.status === "spawn_error") {
+      return {
+        content: `Failed to start PowerShell: ${createSafeDiagnosticMessage(execution.errorMessage)}`,
+        isError: true,
+        diagnostics: { termination: "degraded", sandboxState: "unsupported" },
+      };
+    }
+
+    const output = [
+      `Command: ${input.command}`,
+      `Exit code: ${execution.exitCode ?? -1}`,
+      execution.stdout ? `\nSTDOUT:\n${execution.stdout}` : "",
+      execution.stderr ? `\nSTDERR:\n${execution.stderr}` : "",
+    ].filter(Boolean).join("\n");
+    return {
+      content: output,
+      isError: (execution.exitCode ?? 1) !== 0,
+      diagnostics: { termination: "completed", sandboxState: "unsupported" },
+    };
   },
   isReadOnly(): boolean {
     return false;

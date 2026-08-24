@@ -69,3 +69,11 @@ export interface ToolResultSummary {
   truncated: boolean;
   contentOmitted: true;
 }
+
+export interface ExternalExecutionTraceSummary {
+  kind: "mcp" | "process";
+  sourceName: string;
+  operationName: string;
+  termination?: "completed" | "timeout" | "aborted" | "degraded";
+  sandboxState?: "enabled" | "disabled" | "unsupported" | "degraded";
+}

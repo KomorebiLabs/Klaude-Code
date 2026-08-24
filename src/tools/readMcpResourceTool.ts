@@ -5,6 +5,12 @@ import {
 import type { Tool, ToolContext, ToolResult } from "./Tool.js";
 import { getMcpRegistry } from "../services/mcp/registry.js";
 import type { ConnectedMcpServer } from "../types/mcp.js";
+import { createSafeMessage } from "../observability/redaction.js";
+import {
+  createMcpRequestOptions,
+  MAX_MCP_CONTENT_CHARS,
+  serializeBoundedMcpJsonArray,
+} from "../services/mcp/safety.js";
 
 /**
  * ReadMcpResource — read a single resource (by URI) from a connected MCP server.
@@ -45,7 +51,7 @@ export const readMcpResourceTool: Tool = {
     required: ["server", "uri"],
   },
   maxResultSizeChars: 100_000,
-  async call(rawInput: Record<string, unknown>, _context: ToolContext): Promise<ToolResult> {
+  async call(rawInput: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
     const input = rawInput as unknown as ReadMcpResourceInput;
     if (!input.server || !input.uri) {
       return { content: "Error: server and uri are required", isError: true };
@@ -72,11 +78,12 @@ export const readMcpResourceTool: Tool = {
       result = (await server.client.request(
         { method: "resources/read", params: { uri: input.uri } },
         ReadResourceResultSchema,
+        createMcpRequestOptions(context.abortSignal),
       )) as ReadResourceResult;
     } catch (error) {
       return {
         content: `Error reading resource "${input.uri}" from "${input.server}": ${
-          error instanceof Error ? error.message : String(error)
+          createSafeMessage(error)
         }`,
         isError: true,
       };
@@ -84,20 +91,33 @@ export const readMcpResourceTool: Tool = {
 
     const contents: ReadContent[] = result.contents.map((c) => {
       if (typeof (c as { text?: unknown }).text === "string") {
-        return { uri: c.uri, mimeType: c.mimeType, text: (c as { text: string }).text };
+        return {
+          uri: c.uri.slice(0, 4_096),
+          mimeType: c.mimeType?.slice(0, 256),
+          text: (c as { text: string }).text.slice(
+            0,
+            MAX_MCP_CONTENT_CHARS - 8_192,
+          ),
+        };
       }
       if (typeof (c as { blob?: unknown }).blob === "string") {
         const blob = (c as { blob: string }).blob;
         return {
-          uri: c.uri,
-          mimeType: c.mimeType,
+          uri: c.uri.slice(0, 4_096),
+          mimeType: c.mimeType?.slice(0, 256),
           note: `[binary resource: ${c.mimeType ?? "?"}, ${blob.length} base64 chars — not rendered as text]`,
         };
       }
-      return { uri: c.uri, mimeType: c.mimeType, note: "[empty resource]" };
+      return {
+        uri: c.uri.slice(0, 4_096),
+        mimeType: c.mimeType?.slice(0, 256),
+        note: "[empty resource]",
+      };
     });
 
-    return { content: JSON.stringify({ contents }, null, 2) };
+    return {
+      content: serializeBoundedMcpJsonArray(contents, "contents"),
+    };
   },
   isReadOnly(): boolean {
     return true;

@@ -147,6 +147,11 @@ export interface ToolResult {
   content: string | ContentBlock[];
   /** Whether this call produced an error. */
   isError?: boolean;
+  /** Internal allowlisted lifecycle metadata; never copied into model content. */
+  diagnostics?: {
+    termination?: "completed" | "timeout" | "aborted" | "degraded";
+    sandboxState?: "enabled" | "disabled" | "unsupported" | "degraded";
+  };
 }
 
 // ─── Tool Interface ────────────────────────────────────────────────
@@ -159,9 +164,18 @@ export interface ToolResult {
  */
 export const DEFAULT_MAX_RESULT_SIZE_CHARS = 100_000;
 
+export interface ToolExternalSource {
+  kind: "mcp" | "process";
+  sourceName: string;
+  operationName: string;
+}
+
 export interface Tool {
   /** Unique tool name, sent to the API and used for lookup. */
   readonly name: string;
+
+  /** Allowlisted provenance for execution outside the local process boundary. */
+  readonly externalSource?: ToolExternalSource;
 
   /** Human-readable description shown to the model. */
   readonly description: string;
