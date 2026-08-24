@@ -1,5 +1,13 @@
 import type { ToolResult } from "../tools/Tool.js";
 import { summarizeToolInput, summarizeToolResult } from "./redaction.js";
+import type {
+  PermissionOutcome,
+  PermissionPolicySource,
+  PermissionReasonCode,
+  PermissionResolutionSource,
+  ToolEntryPoint,
+} from "../permissions/permissionContract.js";
+import type { PermissionBehavior } from "../permissions/permissions.js";
 
 export type PermissionDecisionSource =
   | "permission_engine"
@@ -26,13 +34,27 @@ export function createPermissionResolvedPayload(input: {
   decision: "allow" | "deny";
   source: PermissionDecisionSource;
   prompted: boolean;
+  entryPoint: ToolEntryPoint;
+  policyDecision: PermissionBehavior;
+  decisionSource: PermissionPolicySource;
+  reasonCode: PermissionReasonCode;
+  outcome: PermissionOutcome;
+  resolutionSource: PermissionResolutionSource;
+  executionAuthorized: boolean;
 }): Record<string, unknown> {
   return {
     toolName: input.toolName,
     toolUseId: input.toolUseId,
     decision: input.decision,
     source: input.source,
+    entryPoint: input.entryPoint,
+    policyDecision: input.policyDecision,
+    decisionSource: input.decisionSource,
+    reasonCode: input.reasonCode,
+    outcome: input.outcome,
+    resolutionSource: input.resolutionSource,
     prompted: input.prompted,
+    executionAuthorized: input.executionAuthorized,
   };
 }
 

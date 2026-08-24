@@ -21,6 +21,10 @@ import type { TaskMode } from "../../state/taskModeStore.js";
 import type { FileHistorySnapshotRecord } from "../../session/storage.js";
 import type { SettingSource } from "../../config/sources.js";
 import type { ToolContext } from "../../tools/Tool.js";
+import type {
+  PermissionResolutionSource,
+  ToolEntryPoint,
+} from "../../permissions/permissionContract.js";
 
 /**
  * One selectable session in the `/resume` picker. Carries just enough metadata
@@ -134,6 +138,9 @@ export interface QueryEngineOptions {
   permissionSettings?: PermissionSettings;
   sessionPermissionRules?: PermissionRuleSet;
   onPermissionRequest?: (request: PermissionRequest) => Promise<PermissionDecision>;
+  entryPoint?: ToolEntryPoint;
+  bypassPermissions?: boolean;
+  permissionAskSource?: PermissionResolutionSource;
 }
 
 export interface QueryEngineState {

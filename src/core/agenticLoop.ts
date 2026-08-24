@@ -13,11 +13,19 @@ import {
   type PermissionRuleSet,
   type PermissionSettings,
 } from "../permissions/permissions.js";
+import type {
+  PermissionResolutionSource,
+  ToolEntryPoint,
+} from "../permissions/permissionContract.js";
 import { streamMessage } from "../services/api/streaming.js";
 import { ESCALATED_MAX_TOKENS, MAX_OUTPUT_TOKENS_RECOVERY_LIMIT } from "../services/api/client.js";
 import type { QuerySource } from "../services/api/withRetry.js";
 import { compactMessages } from "../context/compaction.js";
 import { findToolByName } from "../tools/index.js";
+import {
+  formatToolInputValidationError,
+  validateToolInput,
+} from "../tools/inputValidation.js";
 import { truncateToolResult, type ToolContext, type ToolResult } from "../tools/Tool.js";
 import { appendTextToContent, prependTextToContent } from "../tools/contentBlocks.js";
 import {
@@ -186,6 +194,9 @@ export interface QueryParams {
    * future "non-interactive" execution context.
    */
   shouldAvoidPermissionPrompts?: boolean;
+  entryPoint?: ToolEntryPoint;
+  bypassPermissions?: boolean;
+  permissionAskSource?: PermissionResolutionSource;
   /**
    * Stage 22: when set, the loop fires SubagentStop hooks (with the
    * supplied id + type) instead of Stop hooks at the end of the
@@ -211,6 +222,11 @@ export interface RunToolsOptions {
   onPermissionRequest?: (request: PermissionRequest) => Promise<PermissionDecision>;
   /** See RunQueryParams.shouldAvoidPermissionPrompts. */
   shouldAvoidPermissionPrompts?: boolean;
+  /** Stable origin used by permission resolution and safe diagnostics. */
+  entryPoint?: ToolEntryPoint;
+  /** Explicit headless bypass: collapses only an `ask`, never a `deny`. */
+  bypassPermissions?: boolean;
+  permissionAskSource?: PermissionResolutionSource;
   /**
    * Conversation so far (before the current tool-use action). Threaded into
    * `checkPermission` so the Auto Mode classifier can infer user intent.
@@ -221,6 +237,10 @@ export interface RunToolsOptions {
   model?: string;
   /** Optional diagnostic Trace propagated from the active Query. */
   traceSink?: TraceSink;
+  /** Narrow deterministic-test seam; production uses the configured Hook runner. */
+  preToolUseHookImpl?: typeof runPreToolUseHooks;
+  /** Query-owned at-most-once guard keyed by model tool_use id. */
+  executionLedger?: Set<string>;
 }
 
 function emitTrace(
@@ -341,6 +361,21 @@ function abortedToolReturn(block: ToolUseBlock): RunOneToolReturn {
   };
 }
 
+function duplicateToolReturn(block: ToolUseBlock): RunOneToolReturn {
+  const toolInput = (block.input as Record<string, unknown>) ?? {};
+  return {
+    execution: {
+      toolUseId: block.id,
+      toolName: block.name,
+      toolInput,
+      result: {
+        content: `Duplicate tool_use id "${block.id}" was not executed again.`,
+        isError: true,
+      },
+    },
+  };
+}
+
 /**
  * Run one tool_use block end-to-end: name lookup, permission check,
  * the actual `tool.call()`, and result truncation. Pure of any
@@ -357,8 +392,10 @@ async function runOneToolBlock(
   context: ToolContext,
   options: RunToolsOptions,
 ): Promise<RunOneToolReturn> {
+  const entryPoint = options.entryPoint ?? "interactive";
   if (context.abortSignal?.aborted) return abortedToolReturn(block);
   const toolInput = (block.input as Record<string, unknown>) ?? {};
+  const toolSpanId = randomUUID();
   const tool = findToolByName(block.name);
   if (!tool) {
     const result: ToolResult = {
@@ -370,7 +407,36 @@ async function runOneToolBlock(
     };
   }
 
-  const toolSpanId = randomUUID();
+  const inputValidation = validateToolInput(tool.inputSchema, toolInput);
+  if (!inputValidation.valid) {
+    emitTrace(
+      options.traceSink,
+      "permission.resolved",
+      createPermissionResolvedPayload({
+        toolName: block.name,
+        toolUseId: block.id,
+        decision: "deny",
+        source: "permission_engine",
+        entryPoint,
+        policyDecision: "deny",
+        decisionSource: "input_validation",
+        reasonCode: "invalid_input",
+        outcome: "invalid",
+        resolutionSource: "policy",
+        prompted: false,
+        executionAuthorized: false,
+      }),
+      toolSpanId,
+    );
+    const result: ToolResult = {
+      content: formatToolInputValidationError(inputValidation),
+      isError: true,
+    };
+    return {
+      execution: { toolUseId: block.id, toolName: block.name, toolInput, result },
+    };
+  }
+
   let toolStartedAt: number | undefined;
 
   try {
@@ -384,7 +450,7 @@ async function runOneToolBlock(
     // Mirrors source's order in
     //   claude-code-source-code/src/services/tools/toolHooks.ts:runPreToolUseHooks
     // which is called from `runToolWithPermissions` BEFORE `checkPermission`.
-    const preOutcome = await runPreToolUseHooks({
+    const preOutcome = await (options.preToolUseHookImpl ?? runPreToolUseHooks)({
       toolName: block.name,
       toolInput,
       toolUseId: block.id,
@@ -403,7 +469,14 @@ async function runOneToolBlock(
           toolUseId: block.id,
           decision: "deny",
           source: "pre_tool_hook",
+          entryPoint,
+          policyDecision: "deny",
+          decisionSource: "pre_tool_hook",
+          reasonCode: "hook_blocked",
+          outcome: "blocked",
+          resolutionSource: "pre_tool_hook",
           prompted: false,
+          executionAuthorized: false,
         }),
         toolSpanId,
       );
@@ -434,16 +507,21 @@ async function runOneToolBlock(
       messages: options.conversationMessages,
       model: options.model,
     });
+    const policyDecision = permission.behavior;
+    const policyDecisionSource = permission.decisionSource;
+    const policyReasonCode = permission.reasonCode;
 
     if (context.abortSignal?.aborted) return abortedToolReturn(block);
     let permissionSource: "permission_engine" | "pre_tool_hook" = "permission_engine";
+    let resolutionSource: PermissionResolutionSource = "policy";
 
     // PreToolUse hook can override the rule-based decision (source's
     // `permissionBehavior` from `processHookJSONOutput`). `deny` we
     // handle above as `blockingError`; `allow` short-circuits the
     // permission flow; `ask` upgrades a would-be `allow` into a prompt.
-    if (preOutcome.permissionBehavior === "allow") {
+    if (preOutcome.permissionBehavior === "allow" && permission.behavior !== "deny") {
       permissionSource = "pre_tool_hook";
+      resolutionSource = "pre_tool_hook";
       permission = {
         ...permission,
         behavior: "allow",
@@ -451,6 +529,7 @@ async function runOneToolBlock(
       };
     } else if (preOutcome.permissionBehavior === "ask" && permission.behavior !== "deny") {
       permissionSource = "pre_tool_hook";
+      resolutionSource = "pre_tool_hook";
       permission = {
         ...permission,
         behavior: "ask",
@@ -467,7 +546,14 @@ async function runOneToolBlock(
           toolUseId: block.id,
           decision: "deny",
           source: permissionSource,
+          entryPoint,
+          policyDecision,
+          decisionSource: policyDecisionSource,
+          reasonCode: policyReasonCode,
+          outcome: "denied",
+          resolutionSource,
           prompted: false,
+          executionAuthorized: false,
         }),
         toolSpanId,
       );
@@ -501,9 +587,14 @@ async function runOneToolBlock(
       let decision: PermissionDecision;
       let decisionSource: "user" | "headless" | "default_deny";
       let prompted = false;
-      if (options.shouldAvoidPermissionPrompts === true) {
+      if (options.bypassPermissions === true && entryPoint === "headless") {
+        decision = "allow_once";
+        decisionSource = "headless";
+        resolutionSource = "bypass";
+      } else if (options.shouldAvoidPermissionPrompts === true) {
         decision = "deny";
         decisionSource = "headless";
+        resolutionSource = entryPoint === "background_subagent" ? "background" : "headless";
       } else {
         // Mark this specific card as blocked on the user's approval so the
         // UI can show "Waiting for permission…" on it (not just the prompt).
@@ -511,6 +602,7 @@ async function runOneToolBlock(
         if (options.onPermissionRequest) {
           prompted = true;
           decisionSource = "user";
+          resolutionSource = options.permissionAskSource ?? "user";
           emitTrace(
             options.traceSink,
             "permission.requested",
@@ -524,6 +616,7 @@ async function runOneToolBlock(
           decision = await options.onPermissionRequest(permission.request);
         } else {
           decisionSource = "default_deny";
+          resolutionSource = "default_deny";
           decision = "deny";
         }
       }
@@ -536,7 +629,14 @@ async function runOneToolBlock(
           toolUseId: block.id,
           decision: decision === "deny" ? "deny" : "allow",
           source: decisionSource,
+          entryPoint,
+          policyDecision,
+          decisionSource: policyDecisionSource,
+          reasonCode: policyReasonCode,
+          outcome: decision === "deny" ? "denied" : "allowed",
+          resolutionSource,
           prompted,
+          executionAuthorized: decision !== "deny",
         }),
         toolSpanId,
       );
@@ -570,13 +670,47 @@ async function runOneToolBlock(
           toolUseId: block.id,
           decision: "allow",
           source: permissionSource,
+          entryPoint,
+          policyDecision,
+          decisionSource: policyDecisionSource,
+          reasonCode: policyReasonCode,
+          outcome: "allowed",
+          resolutionSource,
           prompted: false,
+          executionAuthorized: true,
         }),
         toolSpanId,
       );
     }
 
     if (context.abortSignal?.aborted) return abortedToolReturn(block);
+
+    // Reserve synchronously after authorization and cancellation checks but
+    // before the first execution-related await. A thrown Tool remains spent:
+    // retrying the same model-assigned id could duplicate an external effect.
+    if (options.executionLedger?.has(block.id)) {
+      emitTrace(
+        options.traceSink,
+        "permission.resolved",
+        createPermissionResolvedPayload({
+          toolName: block.name,
+          toolUseId: block.id,
+          decision: "deny",
+          source: "permission_engine",
+          entryPoint,
+          policyDecision,
+          decisionSource: "execution_ledger",
+          reasonCode: "duplicate_tool_use",
+          outcome: "duplicate",
+          resolutionSource: "policy",
+          prompted: false,
+          executionAuthorized: false,
+        }),
+        toolSpanId,
+      );
+      return duplicateToolReturn(block);
+    }
+    options.executionLedger?.add(block.id);
 
     // Stamp the tool_use id onto the per-call context so tools that
     // need to publish out-of-band updates (currently just AgentTool's
@@ -826,6 +960,7 @@ export async function* query(
     turnCount: 0,
     aborted: false,
   };
+  const executionLedger = new Set<string>();
   const abortedResult = (): AgenticLoopResult => ({
     state: { ...state, aborted: true },
     usage: totalUsage,
@@ -1282,9 +1417,13 @@ export async function* query(
         sessionPermissionRules: params.sessionPermissionRules,
         onPermissionRequest: params.onPermissionRequest,
         shouldAvoidPermissionPrompts: params.shouldAvoidPermissionPrompts,
+        entryPoint: params.entryPoint,
+        bypassPermissions: params.bypassPermissions,
+        permissionAskSource: params.permissionAskSource,
         conversationMessages: state.messages,
         model: params.model,
         traceSink: params.traceSink,
+        executionLedger,
       },
     );
 

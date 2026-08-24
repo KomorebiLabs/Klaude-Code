@@ -142,6 +142,7 @@ export async function runAsyncAgentLifecycle(
       ...(params.onPermissionRequest
         ? { onPermissionRequest: params.onPermissionRequest }
         : {}),
+      permissionAskSource: "background",
       // Headless mode for backgrounded sub-agents (source-aligned).
       // The agentic loop honours this by short-circuiting any "ask"
       // permission decision into an auto-deny with workaround

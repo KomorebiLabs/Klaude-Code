@@ -13,6 +13,7 @@
 
 import type Anthropic from "@anthropic-ai/sdk";
 import type { ContentBlock } from "../types/message.js";
+import type { PermissionResolutionSource } from "../permissions/permissionContract.js";
 
 // ─── Interactive questions (AskUserQuestion) ───────────────────────
 
@@ -102,6 +103,8 @@ export interface ToolContext {
   sessionPermissionRules?: unknown;
   /** Parent loop's permission-prompt callback. */
   onPermissionRequest?: unknown;
+  /** Provenance of the parent permission resolver for foreground children. */
+  permissionAskSource?: PermissionResolutionSource;
   /** Parent loop's active model name (sub-agents fall back to this). */
   defaultModel?: string;
   /**
