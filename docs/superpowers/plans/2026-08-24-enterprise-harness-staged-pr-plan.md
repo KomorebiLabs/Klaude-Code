@@ -357,5 +357,4 @@ R2 证据稳定后：PR-15 / PR-16 → PR-17
 
 ## 9. 当前下一步
 
-当前唯一建议授权任务是 **PR-00 / R0 Roadmap Repair**。它完成并合并前，不继续扩展 E1 运行时代码。PR-00 的 JIT 计划应先处理现有文档 dirty/untracked 状态，确保不会覆盖用户学习笔记或把无关迁移纳入 PR。
-
+PR-00～PR-08 已合并，PR-09 / R1-I 已完成实现并等待审查与合并。PR-09 合并后 Resume Release R1 标记为 evidenced；下一阶段必须由维护者从 **PR-10 / E4-A Context Provenance & Budget**、**PR-12 / E5-A Multi-Agent Contract & Worktree Baseline**、**PR-14 / E8 Developer Diagnostics** 中选择一个并单独授权，不能自动启动。

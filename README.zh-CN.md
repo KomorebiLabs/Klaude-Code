@@ -45,11 +45,11 @@ Klaude-Code 当前包含两条相互连接、但性质不同的路线：
 | 路线 | 含义 | 当前位置 |
 |---|---|---|
 | **Original Foundation Track** | 继承并持续加工的功能基础，逐步构建本地 Coding Agent | 阶段 0–34 已实现/持续维护；阶段 35–36 计划中 |
-| **Enterprise Harness Track** | Klaude-Code 独立开展的企业级升级工作 | E0 基础已建立；E1 Trace 基础部分完成；E2–E7 进入加固方向；E8–E9 计划中 |
+| **Enterprise Harness Track** | Klaude-Code 独立开展的企业级升级工作 | R1 的 Trace、可靠性、安全与 Evaluation 纵向闭环已完成；R2/R3 待逐项推进 |
 
 当前实现已经包含终端 CLI、流式模型通信、本地工具、权限、Sandbox、会话、上下文管理、MCP、Skills、Sub-Agent、后台执行、Agent Teams、Hooks、多 Provider、多模态输入以及 Extended Thinking 控制等能力。
 
-第一条企业级 Harness 核心因果链已经完成：Trace 契约与脱敏、本地弹性 JSONL 存储，以及 Query、Model Attempt、API Retry、Stream Restart、Tool、Permission 的真实边界事件。最小 Inspector 可按 sequence 安全读取单份 Trace；E6-A 已提供独立 Evaluation Artifact Store、证据矩阵和确定性 `verify:core` 门禁。更完整的可靠性与安全状态机仍属于后续加固。
+第一条企业级 Harness 纵向链路已经闭合：Trace 契约与脱敏、本地弹性 JSONL 存储，Query、Model Attempt、API Retry、Stream Restart、Tool、Permission 的真实边界事件，以及 Retry/Abort/Recovery、Tool/Permission、文件/进程/MCP 外部安全契约。E6 以独立 Artifact Store、25 项证据矩阵和受控端到端 Trial 提供确定性 `verify:core` 门禁。R1 只代表这些不变量有证据，不代表真实模型成功率或完整企业产品交付。
 
 当前运行时仍然保留从原始实现继承而来的兼容标识，包括 npm package 名称 `easy-agent` 和可执行命令 `agent`。完整的 package、CLI、配置和用户数据迁移被有意放在后续 E9 兼容性项目中；本次 README 品牌重定位不声称这项迁移已经完成。
 
@@ -188,7 +188,7 @@ Enterprise Harness Track 并不是再次声称基础功能不存在，而是新�
 
 ### E0 —— 项目基线与工程治理
 
-**状态：** Foundation: present · Klaude hardening: in-progress
+**状态：** R1 evidenced · 后续领域评测持续演进
 
 项目已经建立独立延伸关系、工程记录、Task 1–3 Trace 文档、Worktree 隔离实践和接班材料。下一步治理工作是让这些实践可以被未来的贡献者和 Agent 稳定复用。
 
@@ -323,6 +323,7 @@ E6 使用独立 Evaluation Run Record 与 Artifact Store 判断受控任务是�
 - ✅ 校验 Trace 生命周期、隐私、Permission Deny 和 Writer Failure Isolation；
 - ✅ 输出机器可读结果和 Markdown 报告；
 - ✅ 只将确定性 Fake Provider/fixture 检查接入 Core CI；
+- ✅ 关闭 25 项 R1 Claim-to-Evidence Matrix，并运行 Model→Permission→Tool→Completion 受控 Trial；
 - 将真实模型实验与 CI 分离，并按 Trial 如实报告；
 - 不声称生产 Trace 可以重放原始模型行为。
 
@@ -387,12 +388,12 @@ Original Foundation Track
 
 Enterprise Harness Track
   E0 治理           Foundation: present   · Klaude hardening: in-progress
-  E1 Trace          Foundation: present   · Klaude hardening: in-progress
-  E2 可靠性         Foundation: inherited · Klaude hardening: not-started
-  E3 安全           Foundation: inherited · Klaude hardening: not-started
+  E1 Trace          Foundation: present   · R1 evidenced
+  E2 可靠性         Foundation: inherited · R1 evidenced
+  E3 安全           Foundation: inherited · R1 evidenced
   E4 上下文/记忆    Foundation: inherited · Klaude hardening: deferred
   E5 多 Agent       Foundation: inherited · Klaude hardening: deferred
-  E6 Evaluation     Foundation: present   · Klaude hardening: in-progress
+  E6 Evaluation     Foundation: present   · R1 evidenced
   E7 扩展           Foundation: inherited · Klaude hardening: deferred
   E8 诊断           Foundation: inherited · Klaude hardening: deferred
   E9 发布           Foundation: inherited · Klaude hardening: deferred
@@ -502,12 +503,9 @@ agent --dump-system-prompt
 
 近期重点将遵循 Enterprise Harness Track，而不是把原始基础路线误认为已经完成的产品工作：
 
-1. PR-00：先统一路线、状态、文档入口和开发窗口；
-2. PR-01～PR-03：收口 Trace 存储契约并补齐 Model/Tool/Permission 因果链；
-3. PR-04：提前建立独立的 E6-A Evaluation Foundation；
-4. PR-05～PR-08：分别完成 Reliability 与 Safety 垂直 Slice；
-5. PR-09：以 Claim-to-Evidence Matrix 关闭 Resume Release R1；
-6. R1 后再按价值推进 E4、E5、E8；E7、E9 保持长期路线。
+1. PR-00～PR-09 已形成 Trace→Reliability→Safety→Evaluation 的 Resume Release R1 证据闭环；
+2. R1 后按 Bad Case 与求职价值，在 E4 Context/Memory、E5 Multi-Agent、E8 Diagnostics 中逐项选择；
+3. E7 Extension Governance、E6-C External Benchmark 与 E9 Packaging/Release 保持长期路线。
 
 ## 贡献策略
 
