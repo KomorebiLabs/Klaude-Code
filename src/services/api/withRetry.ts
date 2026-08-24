@@ -21,9 +21,9 @@
 
 import {
   classifyAPIError,
+  classifyHarnessError,
   getRetryAfterMs,
   is529Error,
-  isRetryableError,
 } from "./errors.js";
 
 /**
@@ -37,6 +37,16 @@ export const DEFAULT_MAX_RETRIES = 10;
 export const BASE_DELAY_MS = 500;
 export const MAX_DELAY_MS = 32_000;
 export const MAX_529_RETRIES = 3;
+/** Preserves the legacy ten-retry worst-case backoff envelope (199,375 ms). */
+export const DEFAULT_RETRY_DELAY_BUDGET_MS = 200_000;
+
+export type RetryStopReason =
+  | "scheduled"
+  | "background_overload"
+  | "overload_limit"
+  | "non_retryable"
+  | "attempts_exhausted"
+  | "delay_budget_exhausted";
 
 /**
  * Max retry attempts, overridable via env for tests / unusual environments.
@@ -97,6 +107,11 @@ export interface RetryDecision {
   delayMs: number;
   /** 1-based count of 529s seen so far (caller threads this back in). */
   consecutive529: number;
+  reason: RetryStopReason;
+  attempt: number;
+  maxAttempts: number;
+  spentDelayMs: number;
+  remainingDelayMs: number;
 }
 
 export function decideRetry(
@@ -106,13 +121,38 @@ export function decideRetry(
     maxRetries: number;
     querySource?: QuerySource;
     consecutive529?: number;
+    maxTotalDelayMs?: number;
+    spentDelayMs?: number;
   },
 ): RetryDecision {
   const consecutive529Prev = options.consecutive529 ?? 0;
+  const maxAttempts = Math.max(1, Math.floor(options.maxRetries) + 1);
+  const maxTotalDelayMs = Math.max(
+    0,
+    options.maxTotalDelayMs ?? DEFAULT_RETRY_DELAY_BUDGET_MS,
+  );
+  const spentDelayMs = Math.min(
+    maxTotalDelayMs,
+    Math.max(0, options.spentDelayMs ?? 0),
+  );
+  const remainingDelayMs = maxTotalDelayMs - spentDelayMs;
+  const stop = (
+    reason: Exclude<RetryStopReason, "scheduled">,
+    consecutive529: number,
+  ): RetryDecision => ({
+    retry: false,
+    delayMs: 0,
+    consecutive529,
+    reason,
+    attempt,
+    maxAttempts,
+    spentDelayMs,
+    remainingDelayMs,
+  });
 
   // Background sources drop 529 immediately — no amplification.
   if (is529Error(error) && !shouldRetry529(options.querySource)) {
-    return { retry: false, delayMs: 0, consecutive529: consecutive529Prev };
+    return stop("background_overload", consecutive529Prev);
   }
 
   const consecutive529 = is529Error(error)
@@ -121,19 +161,39 @@ export function decideRetry(
 
   // Even foreground gives up on a sustained 529 storm.
   if (is529Error(error) && consecutive529 >= MAX_529_RETRIES) {
-    return { retry: false, delayMs: 0, consecutive529 };
+    return stop("overload_limit", consecutive529);
   }
 
-  if (!isRetryableError(error)) {
-    return { retry: false, delayMs: 0, consecutive529 };
+  if (!classifyHarnessError(error).retryable) {
+    return stop("non_retryable", consecutive529);
   }
 
-  if (attempt >= options.maxRetries + 1) {
-    return { retry: false, delayMs: 0, consecutive529 };
+  if (attempt >= maxAttempts) {
+    return stop("attempts_exhausted", consecutive529);
   }
 
   const delayMs = getRetryDelay(attempt, getRetryAfterMs(error));
-  return { retry: true, delayMs, consecutive529 };
+  if (delayMs > remainingDelayMs) {
+    return stop("delay_budget_exhausted", consecutive529);
+  }
+  return {
+    retry: true,
+    delayMs,
+    consecutive529,
+    reason: "scheduled",
+    attempt,
+    maxAttempts,
+    spentDelayMs,
+    remainingDelayMs: remainingDelayMs - delayMs,
+  };
+}
+
+/** A stream attempt is replay-safe only before any user-visible output. */
+export function shouldReplayStreamAttempt(
+  decision: RetryDecision,
+  hasYieldedContent: boolean,
+): boolean {
+  return decision.retry && !hasYieldedContent;
 }
 
 /**
@@ -169,15 +229,20 @@ export async function callWithRetry<T>(
     maxRetries?: number;
     querySource?: QuerySource;
     signal?: AbortSignal;
+    maxTotalDelayMs?: number;
     onRetry?: (info: {
       attempt: number;
       delayMs: number;
       category: string;
+      reason: RetryStopReason;
+      spentDelayMs: number;
+      remainingDelayMs: number;
     }) => void;
   } = {},
 ): Promise<T> {
   const maxRetries = options.maxRetries ?? getMaxRetries();
   let consecutive529 = 0;
+  let spentDelayMs = 0;
   let attempt = 0;
   // eslint-disable-next-line no-constant-condition
   while (true) {
@@ -192,6 +257,8 @@ export async function callWithRetry<T>(
         maxRetries,
         querySource: options.querySource,
         consecutive529,
+        maxTotalDelayMs: options.maxTotalDelayMs,
+        spentDelayMs,
       });
       consecutive529 = decision.consecutive529;
       if (!decision.retry) {
@@ -201,7 +268,11 @@ export async function callWithRetry<T>(
         attempt,
         delayMs: decision.delayMs,
         category: classifyAPIError(error),
+        reason: decision.reason,
+        spentDelayMs,
+        remainingDelayMs: decision.remainingDelayMs,
       });
+      spentDelayMs += decision.delayMs;
       await sleep(decision.delayMs, options.signal);
     }
   }

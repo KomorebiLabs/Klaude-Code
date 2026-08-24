@@ -30,6 +30,7 @@ import {
 } from "../services/api/providers/providerStream.js";
 import type { ModelProfile } from "../services/api/providers/profile.js";
 import type { StreamRequestParams } from "../services/api/streaming.js";
+import { ProviderProtocolError } from "../services/api/errors.js";
 
 const GOLDEN_PATH = path.join(
   import.meta.dirname,
@@ -80,10 +81,35 @@ function restoreFetch(): void {
   globalThis.fetch = realFetch;
 }
 
+async function verifyProtocolFailureClassification(): Promise<void> {
+  globalThis.fetch = (async () =>
+    new Response("<html>gateway</html>", {
+      status: 200,
+      headers: { "content-type": "text/html" },
+    })) as typeof fetch;
+  try {
+    const profile: ModelProfile = {
+      id: "protocol-check",
+      protocol: "openai-chat",
+      model: "test-model",
+      baseURL: "https://example.test/v1",
+      apiKey: "test-key",
+    };
+    const generator = streamViaProvider(profile, params(TEXT_MSGS));
+    await generator.next();
+    assert.fail("non-SSE provider response should fail");
+  } catch (error) {
+    assert(error instanceof ProviderProtocolError);
+    assert(!error.message.includes("gateway"), "provider body is not copied into the error");
+  } finally {
+    restoreFetch();
+  }
+}
+
 // ─── Normalization ───────────────────────────────────────────────────────────
 
 function normalize(text: string): string {
-  let out = text;
+  let out = text.replace(/\r\n/g, "\n");
   // Provider-supplied / time-based ids that legitimately vary run-to-run.
   out = out.replace(/call_\d+_[a-z0-9]+/g, "<CALLID>");
   out = out.replace(/gemini-\d+/g, "<GEMINI_MSG_ID>");
@@ -326,6 +352,7 @@ async function buildRecording(): Promise<string> {
 async function main(): Promise<void> {
   const update = process.argv.includes("--update");
   const recording = await buildRecording();
+  await verifyProtocolFailureClassification();
 
   await mkdir(path.dirname(GOLDEN_PATH), { recursive: true });
 
@@ -337,7 +364,7 @@ async function main(): Promise<void> {
 
   let golden: string;
   try {
-    golden = await readFile(GOLDEN_PATH, "utf8");
+    golden = normalize(await readFile(GOLDEN_PATH, "utf8"));
   } catch {
     process.stderr.write(
       `\u001b[31m[error]\u001b[0m no golden file at ${GOLDEN_PATH}.\n` +

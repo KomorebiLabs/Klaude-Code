@@ -36,6 +36,7 @@ import {
   callWithRetry,
   decideRetry,
   getMaxRetries,
+  shouldReplayStreamAttempt,
   sleep,
   type QuerySource,
 } from "./withRetry.js";
@@ -338,6 +339,7 @@ export async function* streamMessage(
   const model = params.model ?? DEFAULT_MODEL;
   let attempt = 0;
   let consecutive529 = 0;
+  let spentDelayMs = 0;
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
@@ -381,20 +383,25 @@ export async function* streamMessage(
         maxRetries,
         querySource: params.querySource,
         consecutive529,
+        spentDelayMs,
       });
       consecutive529 = decision.consecutive529;
 
       // Only retry if the decision allows it AND nothing has been streamed yet
       // (re-running after partial output would duplicate visible content).
-      if (decision.retry && !hasYieldedContent) {
+      if (shouldReplayStreamAttempt(decision, hasYieldedContent)) {
         yield {
           type: "retry",
           attempt,
           maxRetries,
           delayMs: decision.delayMs,
+          reason: "scheduled",
+          spentDelayMs,
+          remainingDelayMs: decision.remainingDelayMs,
           errorMessage: getUserFacingErrorMessage(error, model),
           category: classifyAPIError(error),
         };
+        spentDelayMs += decision.delayMs;
         await sleep(decision.delayMs, params.signal);
         continue;
       }

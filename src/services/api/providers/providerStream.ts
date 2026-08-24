@@ -27,6 +27,7 @@ import {
   type AnthropicBody,
 } from "llm-bridge";
 import { APIError } from "@anthropic-ai/sdk";
+import { ProviderProtocolError } from "../errors.js";
 
 import { DEFAULT_MAX_TOKENS } from "../client.js";
 import type { StreamRequestParams, StreamResult } from "../streaming.js";
@@ -255,29 +256,9 @@ export async function* streamViaProvider(
   // Surface it loudly with an actionable hint instead.
   const contentType = response.headers.get("content-type") ?? "";
   if (!contentType.toLowerCase().includes("event-stream")) {
-    let bodyText = "";
-    try {
-      bodyText = await response.text();
-    } catch {
-      /* ignore */
-    }
-    const snippet = bodyText.replace(/\s+/g, " ").trim().slice(0, 160);
-    const hint =
-      profile.protocol === "gemini"
-        ? 'the Gemini baseURL usually ends in "/v1beta"'
-        : 'OpenAI-compatible baseURLs usually end in "/v1"';
-    // Status 400 → classified as a deterministic "invalid_request" (not retried),
-    // so the user sees the message once instead of after pointless retries.
-    throw APIError.generate(
-      400,
-      undefined,
-      `Expected a streaming response from ${prepared.url} but received "${
-        contentType || "an unknown content type"
-      }". This usually means the model's baseURL is wrong — ${hint}.${
-        snippet ? ` Response began: ${snippet}` : ""
-      }`,
-      response.headers,
-    );
+    // Do not include the response body or endpoint in the error. Apart from
+    // being noisy, gateway pages may echo credentials or request content.
+    throw new ProviderProtocolError();
   }
 
   // Gemini gets a dedicated assembler that preserves thoughtSignature (which
@@ -368,7 +349,7 @@ export async function* streamViaProvider(
         break;
       }
       case "error": {
-        throw new Error(event.error.message || "Provider stream error");
+        throw new ProviderProtocolError();
       }
     }
   }

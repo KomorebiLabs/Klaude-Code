@@ -26,6 +26,8 @@ import {
   parsePromptTooLongTokenCounts,
   getRetryAfterMs,
   getUserFacingErrorMessage,
+  classifyHarnessError,
+  ProviderProtocolError,
 } from "../services/api/errors.js";
 import {
   getRetryDelay,
@@ -37,6 +39,8 @@ import {
   MAX_DELAY_MS,
   MAX_529_RETRIES,
   DEFAULT_MAX_RETRIES,
+  DEFAULT_RETRY_DELAY_BUDGET_MS,
+  shouldReplayStreamAttempt,
 } from "../services/api/withRetry.js";
 
 let failures = 0;
@@ -92,6 +96,10 @@ async function main(): Promise<void> {
   assert(classifyAPIError(new APIConnectionError({ message: "ECONNRESET" })) === "connection_error", "conn error → connection_error");
   assert(classifyAPIError(abortError()) === "aborted", "AbortError → aborted");
   assert(classifyAPIError(new Error("weird")) === "unknown", "unknown → unknown");
+  assert(classifyHarnessError(apiError(429, "x")).kind === "rate_limited", "429 → Harness rate_limited");
+  assert(classifyHarnessError(apiError(503, "x")).kind === "transient", "503 → Harness transient");
+  assert(classifyHarnessError(apiError(401, "x")).kind === "permanent", "401 → Harness permanent");
+  assert(classifyHarnessError(new ProviderProtocolError()).kind === "provider_protocol", "invalid provider response → Harness provider_protocol");
 
   section("[2] Retryability");
   assert(isRetryableError(apiError(429, "x")) === true, "429 retryable");
@@ -160,6 +168,20 @@ async function main(): Promise<void> {
   // exhausted attempts
   assert(decideRetry(apiError(500, "x"), 11, { maxRetries: 10 }).retry === false, "decideRetry: attempt > maxRetries → no retry");
   assert(decideRetry(apiError(500, "x"), 1, { maxRetries: 10 }).retry === true, "decideRetry: 500 within budget → retry");
+  const budgetExhausted = decideRetry(apiError(429, "x", { "retry-after": "10" }), 1, {
+    maxRetries: 10,
+    maxTotalDelayMs: 5_000,
+    spentDelayMs: 0,
+  });
+  assert(budgetExhausted.retry === false && budgetExhausted.reason === "delay_budget_exhausted", "Retry-After beyond remaining budget → no retry");
+  const budgetAllowed = decideRetry(apiError(500, "x"), 1, {
+    maxRetries: 10,
+    maxTotalDelayMs: 5_000,
+    spentDelayMs: 4_000,
+  });
+  assert(budgetAllowed.retry && budgetAllowed.delayMs <= 1_000, "Backoff stays within remaining delay budget");
+  assert(!shouldReplayStreamAttempt(budgetAllowed, true), "Partial output blocks stream replay");
+  assert(shouldReplayStreamAttempt(budgetAllowed, false), "Pre-output transient failure remains replayable");
 
   section("[5] prompt-too-long parsing");
   assert(isPromptTooLongError(apiError(400, "prompt is too long: 5 tokens > 4 maximum")), "isPromptTooLongError true for 400 msg");
@@ -246,6 +268,7 @@ async function main(): Promise<void> {
 
   section("[8] getMaxRetries env override");
   assert(getMaxRetries() === DEFAULT_MAX_RETRIES, `default maxRetries = ${DEFAULT_MAX_RETRIES}`);
+  assert(DEFAULT_RETRY_DELAY_BUDGET_MS >= 199_375, "default delay budget preserves legacy retry envelope");
   process.env.EASY_AGENT_MAX_RETRIES = "2";
   assert(getMaxRetries() === 2, "EASY_AGENT_MAX_RETRIES overrides default");
   delete process.env.EASY_AGENT_MAX_RETRIES;
