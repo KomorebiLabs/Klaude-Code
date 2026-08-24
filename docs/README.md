@@ -174,9 +174,9 @@ status: historical-reference
 
 ## 当前状态
 
-- PR-00～PR-07：路线修复、Trace/Inspector、Evaluation Foundation、可靠性恢复与 Tool/Permission Safety Contract 已合并。
-- PR-08 / R1-H Sandbox / MCP / Secret Safety：当前实现阶段，待 PR 审查与合并。
-- 合并后下一候选是 PR-09 / R1-I Evidence Closure & Resume Release；未经单独授权不得启动。
+- PR-00～PR-08：路线修复、Trace/Inspector、Evaluation Foundation、可靠性恢复、Tool/Permission 与 External Safety 已合并。
+- PR-09 / R1-I Evidence Closure & Resume Release：实现完成，待验证、审查与合并；合并后 R1 标记为 evidenced。
+- R1 后候选为 PR-10 Context Provenance、PR-12 Multi-Agent Contract 或 PR-14 Developer Diagnostics，由维护者单独选择和授权。
 - 既有文档的历史归属暂不在本文件更新中强制调整；后续新增文档必须遵守本规则。
 
 > [!warning] 维护底线
