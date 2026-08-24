@@ -119,13 +119,14 @@ Klaude-Code/
 1. **Original Foundation Track** —— 继承并持续加工的原始 Easy Agent 功能基础路线。
 2. **Klaude-Code Enterprise Harness Track** —— 让这些能力更安全、更可靠、更可观测、更容易评估和运维的独立加固路线。
 
-## 状态标签
+## 状态表达
 
-- ✅ **Implemented** —— 已有代码、文档和聚焦验证证据支持。
-- 🔧 **Hardening** —— 能力基础已经存在，正在加固生产级边界、恢复、可观测性或治理。
-- 🚧 **In Progress** —— 当前存在明确范围的实现 Slice，正在进行中。
-- 📋 **Planned** —— 已确定方向，但尚未进入当前实现周期。
-- 🔬 **Research Direction** —— 需要进一步实验和证据，不承诺近期交付。
+Enterprise Harness 阶段使用两个维度，避免把继承能力误报为 Klaude-Code 已完成的独立加固：
+
+- **Foundation:** `absent | inherited | present`
+- **Klaude hardening:** `not-started | in-progress | evidenced | deferred`
+
+`Foundation` 说明运行基础是否存在；`Klaude hardening` 只有在实现、聚焦验证、Dev Doc 和限制说明形成闭环后才能标记为 `evidenced`。
 
 ## 原始基础路线：Original Foundation Track
 
@@ -183,11 +184,11 @@ Klaude-Code/
 
 ## Klaude-Code 企业级 Harness 路线
 
-Enterprise Harness Track 并不是再次声称基础功能不存在，而是新增的工程层：让已有功能变得可观测、可恢复、安全、可评估和可维护。因此早期多个阶段会使用 **🔧 Hardening**，而不是简单标为“从零计划开发”。
+Enterprise Harness Track 并不是再次声称基础功能不存在，而是新增的工程层：让已有功能变得可观测、可恢复、安全、可评估和可维护。领域编号 E0–E9 表示能力域，不再被解释为必须按编号串行完成的瀑布顺序。
 
 ### E0 —— 项目基线与工程治理
 
-**状态：** ✅ Implemented · 🔧 Hardening
+**状态：** Foundation: present · Klaude hardening: in-progress
 
 项目已经建立独立延伸关系、工程记录、Task 1–3 Trace 文档、Worktree 隔离实践和接班材料。下一步治理工作是让这些实践可以被未来的贡献者和 Agent 稳定复用。
 
@@ -202,7 +203,7 @@ Enterprise Harness Track 并不是再次声称基础功能不存在，而是新�
 
 ### E1 —— 可观测性与 Trace 基础
 
-**状态：** 🚧 In Progress
+**状态：** Foundation: present · Klaude hardening: in-progress
 
 Task 1–3 已经建立了第一条本地结构化 Trace Slice。E1 的后续工作是把现有模型、重试、工具和权限边界接入同一个证据模型，而不是重新实现这些运行时能力。
 
@@ -219,11 +220,26 @@ Task 1–3 已经建立了第一条本地结构化 Trace Slice。E1 的后续工
 - 📋 增加 Trace 检查/导出 CLI 和诊断包格式；
 - 📋 定义 Trace schema 迁移和保留规则。
 
-当前证据：Task 1–3 的契约、存储、隐私和 QueryEngine 生命周期工作见 [`docs/engineering/`](./docs/engineering/)。当前生命周期 payload 不记录 prompt 内容、system prompt、消息正文、工具输入/输出正文、stdout/stderr 或 API key。
+当前证据：Task 1–3 的契约、存储、隐私和 QueryEngine 生命周期工作见 [`docs/`](./docs/)。当前生命周期 payload 不记录 prompt 内容、system prompt、消息正文、工具输入/输出正文、stdout/stderr 或 API key。
+
+### 文档
+
+项目文档保持有意的简洁结构：
+
+```text
+docs/
+├── README.md                         # 文档入口与组织规则
+├── learning/E0/                      # 当前阶段汇报与既有 Trace 文档
+├── superpowers/mainTask/             # 权威长期任务书与窗口提示
+├── superpowers/plans/                # 审计路线、阶段 PR 与 JIT 计划
+└── archive/                          # 历史计划和旧索引
+```
+
+当前 worktree 不存在 `docs/engineering/` 入口，不能继续引用它作为有效目录。阅读从 [`docs/README.md`](./docs/README.md) 开始；长期方向以 [`MainTask.md`](./docs/superpowers/mainTask/MainTask.md) 为准，执行顺序以 [阶段性 PR 安排](./docs/superpowers/plans/2026-08-24-enterprise-harness-staged-pr-plan.md) 为准。
 
 ### E2 —— 运行时可靠性与恢复加固
 
-**状态：** 🔧 Hardening
+**状态：** Foundation: inherited · Klaude hardening: not-started
 
 基础实现已经包含 API 错误分类、可重试判断、流式重试、abort 处理、韧性路径和上下文溢出处理。E2 将统一这些机制的语义，并通过证据建立可验证的恢复保证。
 
@@ -242,7 +258,7 @@ Task 1–3 已经建立了第一条本地结构化 Trace Slice。E1 的后续工
 
 ### E3 —— 工具与权限安全加固
 
-**状态：** 🔧 Hardening
+**状态：** Foundation: inherited · Klaude hardening: not-started
 
 工具、Permission Mode、Auto Mode 和 Sandbox 控制已经存在。E3 的目标是让它们形成更加一致、可治理、可审计的安全边界。
 
@@ -261,7 +277,7 @@ Task 1–3 已经建立了第一条本地结构化 Trace Slice。E1 的后续工
 
 ### E4 —— 上下文、记忆与成本治理
 
-**状态：** 🔧 Hardening
+**状态：** Foundation: inherited · Klaude hardening: deferred
 
 上下文加载、Compaction、Memory、项目指令、会话历史和 Token Budget 已经存在。E4 让它们的信息流和成本行为变得可解释、可测试。
 
@@ -278,46 +294,41 @@ Task 1–3 已经建立了第一条本地结构化 Trace Slice。E1 的后续工
 - 📋 增加 context/memory 检查命令和评估 fixtures；
 - 🔬 只有在拥有来源追踪和回归证据后，才研究基于任务的动态上下文预算。
 
-### E5 —— Evaluation、回放与质量门禁
+### E5 —— 多 Agent 与 Worktree 编排
 
-**状态：** 📋 Planned
+**状态：** Foundation: inherited · Klaude hardening: deferred
 
-E5 通过消费结构化 Trace 来闭环，而不是只判断最终文本。它将在运行时证据模型足够稳定、能够产生有意义 fixtures 后开始。
-
-任务：
-
-- 📋 校验 Trace schema、sequence 顺序、生命周期完整性和隐私不变量；
-- 📋 评估模型重试、流式恢复、最终失败和 abort 行为；
-- 📋 评估权限决策和工具调用安全边界；
-- 📋 评估上下文加载、compaction、memory 检索和预算行为；
-- 📋 建立可确定性回放的 Trace fixtures；
-- 📋 比较不同 commit 的行为变化并产生机器可读结果；
-- 📋 为高价值不变量增加最小的合并前回归门禁；
-- 📋 生成带失败解释的人类可读 Evaluation 报告；
-- 🔬 只有在过程级检查具备确定性后，才研究结果质量评估。
-
-### E6 —— 多 Agent 与 Worktree 编排
-
-**状态：** 🔧 Hardening
-
-Sub-Agent、后台执行、Agent Teams 和 Worktree 隔离已经提供并行执行原语。E6 为其补充所有权、基线、恢复、合并和交接纪律。
+Sub-Agent、后台执行、Agent Teams 和 Worktree 隔离已经提供并行执行原语。E5 为其补充所有权、基线、恢复、合并和交接纪律。
 
 任务：
 
-- 🔧 将工作拆分成具有明确输出、可独立验证的任务；
-- 🔧 声明文件所有权，并在启动前检查重叠写入计划；
-- 🔧 明确选择 `fresh`、`head` 或特定 commit 作为 Worktree 基线；
-- 🔧 记录 Subagent snapshot 语义和信息交接方式；
-- 🔧 将 worker 测试证据和主会话合并后的最终验证分开；
-- 🔧 从 Agent 超时、阻塞、部分完成和清理失败中恢复；
-- 🔧 删除 Worktree 前审计未提交、未跟踪、未合并和未发布的工作；
-- 🔧 保存交接状态、产物、测试结果和下一步动作；
-- 📋 自动化 ownership/conflict 检查和并行任务依赖图；
-- 🔬 只有在所有权和合并证据可靠后，才研究基于风险的并发决策。
+- 声明 Task Goal/Input/Output/Owner/Dependency/Handoff；
+- 在启动前检查 File Ownership 与重叠写入；
+- 明确 `fresh`、`head` 或特定 commit 的 Worktree baseline；
+- 解释 Parent/Child snapshot 与 Trace；
+- 保留 Timeout/Partial Completion 的状态和交接证据；
+- 将 worker 证明与主会话最终整合责任分离；
+- 删除 Worktree 前审计未提交、未跟踪和未合并工作。
+
+### E6 —— Evaluation、Benchmark 与质量门禁
+
+**状态：** Foundation: absent · Klaude hardening: not-started
+
+E6 使用独立 Evaluation Run Record 与 Artifact Store 判断受控任务是否满足成功标准，不把隐私最小化 Runtime Trace 扩张成完整会话采集。E6-A 骨架在 E1 后提前建立，E6-B 在 E2/E3 后关闭 R1 证据闭环。
+
+任务：
+
+- 定义 Task、Trial、Grader、Evaluation Result 的窄契约；
+- 建立 R1 Claim/Invariant-to-Evidence Matrix；
+- 校验 Trace 生命周期、隐私、Permission Deny 和 Writer Failure Isolation；
+- 输出机器可读结果和 Markdown 报告；
+- 只将确定性 Fake Provider/fixture 检查接入 Core CI；
+- 将真实模型实验与 CI 分离，并按 Trial 如实报告；
+- 不声称生产 Trace 可以重放原始模型行为。
 
 ### E7 —— 扩展与插件生态加固
 
-**状态：** 🔧 Hardening
+**状态：** Foundation: inherited · Klaude hardening: deferred
 
 Skills、Hooks、MCP、Agent 定义和未来 Plugin 已经形成多个扩展点。E7 在扩大分发之前，先建立统一的生命周期和能力边界。
 
@@ -335,7 +346,7 @@ Skills、Hooks、MCP、Agent 定义和未来 Plugin 已经形成多个扩展点�
 
 ### E8 —— 开发者体验与诊断
 
-**状态：** 📋 Planned · 🔬 Research Direction
+**状态：** Foundation: inherited · Klaude hardening: deferred
 
 E8 将内部证据转化为能够帮助开发者理解和恢复运行的反馈。
 
@@ -351,7 +362,7 @@ E8 将内部证据转化为能够帮助开发者理解和恢复运行的反馈�
 
 ### E9 —— 打包、兼容性与运行准备
 
-**状态：** 📋 Planned · 🔬 Research Direction
+**状态：** Foundation: inherited · Klaude hardening: deferred
 
 E9 才是谨慎迁移运行时身份的阶段。本次 README 品牌重定位不包含这项迁移。
 
@@ -375,16 +386,16 @@ Original Foundation Track
   阶段 35–36 📋 Planned
 
 Enterprise Harness Track
-  E0 治理           ✅ Implemented · 🔧 Hardening
-  E1 Trace          🚧 In Progress（Task 1–3 已实现，下一步扩展运行时证据）
-  E2 可靠性         🔧 Hardening
-  E3 安全           🔧 Hardening
-  E4 上下文/记忆    🔧 Hardening
-  E5 Evaluation     📋 Planned
-  E6 多 Agent       🔧 Hardening
-  E7 扩展           🔧 Hardening
-  E8 诊断           📋 Planned · 🔬 Research Direction
-  E9 发布           📋 Planned · 🔬 Research Direction
+  E0 治理           Foundation: present   · Klaude hardening: in-progress
+  E1 Trace          Foundation: present   · Klaude hardening: in-progress
+  E2 可靠性         Foundation: inherited · Klaude hardening: not-started
+  E3 安全           Foundation: inherited · Klaude hardening: not-started
+  E4 上下文/记忆    Foundation: inherited · Klaude hardening: deferred
+  E5 多 Agent       Foundation: inherited · Klaude hardening: deferred
+  E6 Evaluation     Foundation: absent    · Klaude hardening: not-started
+  E7 扩展           Foundation: inherited · Klaude hardening: deferred
+  E8 诊断           Foundation: inherited · Klaude hardening: deferred
+  E9 发布           Foundation: inherited · Klaude hardening: deferred
 ```
 
 当前定位有意比长期愿景更窄：Klaude-Code 已经拥有本地 Coding Agent 的功能基础，也已经部分完成结构化 Trace 基础。Enterprise Harness Track 是一项正在进行的加固与评估计划，并不声称项目已经成为 Claude Code 或 Codex 的完整生产替代品。
@@ -491,11 +502,12 @@ agent --dump-system-prompt
 
 近期重点将遵循 Enterprise Harness Track，而不是把原始基础路线误认为已经完成的产品工作：
 
-1. 继续 E1 Trace Slice，加入模型 attempt 和工具/权限事件；
-2. 加固已有的 retry、streaming、permission、sandbox、context、memory 和 Worktree 行为；
-3. 设计第一批确定性的 Trace-based Evaluation fixtures；
-4. 为每个加固 Slice 记录边界、证据和回归结果；
-5. 在必要的生命周期、安全、兼容性和发布门禁建立后，再推进阶段 35–36 的插件与打包工作。
+1. PR-00：先统一路线、状态、文档入口和开发窗口；
+2. PR-01～PR-03：收口 Trace 存储契约并补齐 Model/Tool/Permission 因果链；
+3. PR-04：提前建立独立的 E6-A Evaluation Foundation；
+4. PR-05～PR-08：分别完成 Reliability 与 Safety 垂直 Slice；
+5. PR-09：以 Claim-to-Evidence Matrix 关闭 Resume Release R1；
+6. R1 后再按价值推进 E4、E5、E8；E7、E9 保持长期路线。
 
 ## 贡献策略
 

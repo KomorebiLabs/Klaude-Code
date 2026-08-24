@@ -219,7 +219,21 @@ Tasks:
 - 📋 add a Trace inspection/export CLI and diagnostic bundle format;
 - 📋 define Trace schema migration and retention rules.
 
-Current evidence: see the engineering documents under [`docs/engineering/`](./docs/engineering/) for the Task 1–3 contract, storage, privacy, and QueryEngine lifecycle work. The current lifecycle payloads do not record prompt contents, system prompts, message bodies, tool input/output contents, stdout/stderr, or API keys.
+Current evidence: see the current documentation under [`docs/`](./docs/) for the Task 1–3 contract, storage, privacy, and QueryEngine lifecycle work. The current lifecycle payloads do not record prompt contents, system prompts, message bodies, tool input/output contents, stdout/stderr, or API keys.
+
+### Documentation
+
+The project keeps documentation intentionally simple:
+
+```text
+docs/
+├── README.md                         # single documentation entry point
+├── trace-*.md / task-*.md            # current engineering documents
+├── learning/                         # learning and interview notes
+└── archive/                          # historical plans and retired indexes
+```
+
+New active task and engineering documents go directly under `docs/`. Do not create additional `engineering/`, `adr/`, `specs/`, `evaluation/`, `dev-docs/`, or `roadmap/` subdirectories. Use `docs/learning/` only for learning/interview material and `docs/archive/` only for historical or superseded documents. Start with [`docs/README.md`](./docs/README.md).
 
 ### E2 — Runtime Reliability & Recovery Hardening
 

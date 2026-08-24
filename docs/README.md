@@ -1,104 +1,183 @@
 ---
-title: "Klaude-Code 文档中心"
+title: "Klaude-Code Docs"
 date: 2026-08-04
-updated: 2026-08-04
+updated: 2026-08-24
 tags:
   - klaude-code
   - documentation
   - index
 aliases:
-  - 文档中心
+  - 文档入口
   - Docs Index
 status: active
 ---
 
-# Klaude-Code 文档中心
+# Klaude-Code Docs
 
-> [!abstract] 如何使用这个目录
-> 这里的文档不是一组重复 README，而是按照 **路线 → 决策 → 规范 → 验收 → 实现 → 学习 → 交接** 分层组织。先看你要回答的问题，再进入对应层级。
+> [!abstract] 文档管理原则
+> 文档按照**面向谁、处于什么阶段、是否仍然有效**来组织，而不是按照复杂的技术名词层层拆分。`docs/README.md` 是唯一入口；新增文档前先判断它的读者和生命周期。
 
-## 当前项目位置
+## 文件夹总览
 
-- 原始基础路线：Stage 0–34 已实现/持续加工，Stage 35–36 仍是基础路线计划。
-- Enterprise Harness 路线：README 中的 E0–E9 是当前对外长期路线。
-- P0 Trace：Task 1–3 已完成；模型/工具/权限 Trace 与 Evaluation 仍在后续加固和计划中。
-
-> [!warning] 文档状态边界
-> 代码和提交事实优先于历史文档中的旧状态。规范/ADR 说明“应该如何做”，Task 开发文档说明“已经做了什么”，学习文档说明“如何理解和表达”。
-
-## 推荐阅读路径
-
-### 我想快速理解项目
-
-1. [项目 README](../README.md)
-2. [工程文档索引](./engineering/README.md)
-3. [P0–P4 历史总控](./engineering/roadmap/p0-p4-upgrade-master-plan.md)
-
-### 我想理解 Trace 为什么这样设计
-
-1. [ADR-001：本地结构化 Harness Trace](./engineering/adr/ADR-001-local-structured-harness-trace.md)
-2. [Trace 事件契约](./engineering/specs/harness-trace-event-contract.md)
-3. [Trace 存储与隐私规范](./engineering/specs/harness-trace-storage-and-privacy.md)
-4. [Trace MVP 验收计划](./engineering/evaluation/trace-mvp-acceptance-plan.md)
-
-### 我想知道 Task 1–3 实际改了什么
-
-1. [Task 1：Trace 契约与安全基础](./engineering/dev-docs/task-1-trace-contract-foundation.md)
-2. [Task 2：JSONL Trace 存储](./engineering/dev-docs/task-2-jsonl-trace-storage.md)
-3. [Task 3：QueryEngine 生命周期 Trace](./engineering/dev-docs/task-3-query-lifecycle-trace.md)
-
-### 我想学习或准备面试
-
-1. [为什么先做 Trace 与 Evaluation](./learning/enterprise-upgrade/01-why-trace-and-evaluation-first.md)
-2. [Trace 架构与实施推演](./learning/enterprise-upgrade/02-trace-architecture-and-implementation-plan.md)
-3. 再回看对应的 ADR、规范和 Task 实现报告。
-
-### 我是接班 Agent
-
-1. 先读项目根目录 `CLAUDE.md`。
-2. 再读 [工程文档索引](./engineering/README.md)。
-3. 读取用户知识库中的接班文档：`8.Easy-Agent项目接班Agent工作交接文档.md`。
-4. 未经用户明确启动，不要自动开始 Task 4。
-
-## 文档分层
-
-| 层级 | 目录/文件 | 回答的问题 |
-|---|---|---|
-| 对外定位 | `README.md`、`README.zh-CN.md` | 项目是什么、当前做到哪里、未来做什么 |
-| 路线 | `engineering/roadmap/` | 为什么按这个优先级升级 |
-| 架构决策 | `engineering/adr/` | 为什么选择这个方案，而不是替代方案 |
-| 技术规范 | `engineering/specs/` | 事件、存储、隐私边界具体遵守什么契约 |
-| 验收评估 | `engineering/evaluation/` | 什么条件下算完成、如何回归 |
-| 实现报告 | `engineering/dev-docs/` | 每个 Task 改了什么、遇到什么困难、如何验证 |
-| 学习材料 | `learning/` | 如何理解架构、如何进行面试推演 |
-| 接班材料 | 外部知识库/未来 `handoff/` | 新 Agent 如何快速恢复上下文 |
-
-## 路线版本关系
-
-```mermaid
-flowchart LR
-    P[P0–P4<br/>早期历史优先级] --> E[E0–E9<br/>当前公开长期路线]
-    E --> T[Task slices<br/>可独立实现与验收]
-    T --> R[Trace / Evaluation<br/>运行证据与回归]
+```text
+docs/
+├── README.md                  # 唯一文档入口和规则说明
+├── learning/
+│   └── E0/                    # 当前既有阶段汇报与 Trace 文档
+├── superpowers/
+│   ├── mainTask/
+│   │   ├── MainTask.md        # 权威长期方向
+│   │   └── Prompt.md          # 单 PR 开发窗口提示
+│   └── plans/                 # 审计路线、阶段 PR 与 JIT 计划
+└── archive/                   # 历史和已被替代的资料
 ```
 
-> [!note] P0–P4 与 E0–E9 的关系
-> `P0–P4` 是早期升级优先级和设计历史；`E0–E9` 是当前 README 对外使用的长期 Enterprise Harness 路线。前者不删除，后者作为当前公开路线；二者不是两套互相冲突的项目。
+> [!important] 当前目录的实际状态
+> 上述目录来自当前 worktree 的实际文件。当前不存在 `docs/engineering/` 或 `docs/other/`，因此不把它们列为有效入口；已有文件不在本次路线修复中移动或重命名。
 
-## 文档状态标签
+## 1. `learning/`：面向你的阶段汇报
 
-- ✅ **Implemented**：代码、文档和聚焦验证均有证据。
-- 🔧 **Hardening**：基础能力存在，正在补生产级边界、恢复、观测或治理。
-- 🚧 **In Progress**：当前已有明确实现 Slice。
-- 📋 **Planned**：方向已确定，但尚未进入当前实现周期。
-- 🔬 **Research Direction**：需要实验和证据，暂不承诺交付。
+这是**给项目负责人阅读的文档**，不是给主 Agent 执行任务的计划。
 
-## 维护规则
+当前已有阶段汇报位于：
 
-1. 新的架构方向先更新路线或 ADR，再进入实现。
-2. 新的字段、事件和隐私边界先更新 specs，再修改代码。
-3. 每个完成的 Task 在 `engineering/dev-docs/` 记录实现、困难和验证。
-4. 验收标准集中在 `engineering/evaluation/`，不要散落到多个 Task 文档。
-5. 历史文档保留事实，但过时状态必须加说明或更新 frontmatter。
-6. 移动文档使用 `git mv`，同步修复 Obsidian wikilink 和 Markdown 相对链接。
-7. 项目工程文档只在隔离 worktree 中维护；不要触碰主仓库的学习笔记。
+```text
+learning/E0/
+```
+
+后续按需建立阶段目录时，文档应以“阶段汇报”的形式记录：
+
+1. 这个阶段做了什么；
+2. 实现后产生了什么效果；
+3. 为什么选择这样做；
+4. 涉及了哪些重要设计决策；
+5. 遇到了哪些真实困难；
+6. 困难是如何定位和解决的；
+7. 哪些内容是面试重点；
+8. 当前完成到什么程度；
+9. 下一步是什么。
+
+推荐文件风格：
+
+```text
+learning/E1/
+├── phase-1-trace-foundation-report.md
+├── phase-2-query-lifecycle-report.md
+└── phase-3-reliability-report.md
+```
+
+这类文件应当使用清晰的中文解释，优先服务于你的阅读、复盘和面试准备。不要把大量 Agent 执行命令、内部任务拆解或临时调试过程直接堆进这里。
+
+## 2. `superpowers/plans/`：面向主 Agent 的计划与执行文档
+
+这是**给主 Agent 和执行流程使用的文档**，不是阶段汇报。
+
+适合放入：
+
+- 实现计划；
+- 任务拆解；
+- 执行方案；
+- 文件修改清单；
+- 测试和验证步骤；
+- Agent/Subagent 的工作说明；
+- 设计确认后的实施边界；
+- 需要按步骤执行的工程任务。
+
+当计划数量较少时，可以直接放在：
+
+```text
+docs/superpowers/plans/
+```
+
+命名建议：
+
+```text
+YYYY-MM-DD-<short-topic>.md
+```
+
+例如：
+
+```text
+docs/superpowers/plans/2026-08-24-r0-roadmap-repair-implementation-plan.md
+```
+
+计划文档应回答：
+
+```text
+要实现什么？
+为什么现在实现？
+修改哪些文件？
+按什么步骤执行？
+如何验证？
+什么不在范围内？
+```
+
+## 3. `archive/`：历史和过时资料
+
+`archive/` 用于保存仍有参考价值、但不应作为当前执行依据的资料，例如：
+
+- 已被新路线替代的旧计划；
+- 旧版文档索引；
+- 已完成阶段的历史实施计划；
+- 过时但能说明设计演进的文档；
+- 不再适用于当前分支/目录结构的材料。
+
+归档不等于删除。归档文件可以保留历史上下文，但必须避免被新 Agent 当成当前规则执行。
+
+归档文件顶部最好标明：
+
+```yaml
+status: historical-reference
+```
+
+## 文档归属判断流程
+
+新增文档时只问三个问题：
+
+```text
+第一问：主要给谁看？
+  给项目负责人 → learning/E*
+  给主 Agent 执行 → superpowers/plans/
+  都不是 → 继续第二问
+
+第二问：以后是否仍作为当前依据？
+  是 → 放入对应的 learning/E* 或 plans 子目录
+  否 → archive/
+
+第三问：暂时无法判断归属？
+  → 保持草稿状态并先确认，不创建含义模糊的新顶层目录
+```
+
+## 当前项目的阅读入口
+
+### 你本人阅读
+
+从对应阶段的 `learning/E*` 文件夹开始，优先阅读阶段汇报，而不是 Agent 计划。
+
+### 主 Agent 接收任务
+
+先读 `docs/superpowers/mainTask/MainTask.md`，再读阶段性 PR 安排和当前 Stage 的 JIT Plan。
+
+### 新 Agent 接班
+
+先读取：
+
+1. 项目根目录 `CLAUDE.md`；
+2. `docs/README.md`；
+3. `docs/superpowers/mainTask/MainTask.md`；
+4. `docs/superpowers/mainTask/Prompt.md` 中当前已授权 PR Stage；
+5. [修订路线](./superpowers/plans/2026-08-24-enterprise-harness-revised-development-roadmap.md)；
+6. [阶段性 PR 安排](./superpowers/plans/2026-08-24-enterprise-harness-staged-pr-plan.md)；
+7. 当前 Stage 的 JIT Plan 和前序 Dev Doc/交接；
+8. `archive/` 只在需要追查历史决策时阅读。
+
+## 当前状态
+
+- Task 1–3 Trace foundation：已有实现与聚焦证据。
+- PR-00 / R0 Roadmap Repair：当前执行阶段。
+- PR-01 / R1-A Trace Storage & Availability Contract：PR-00 完成后的唯一下一候选。
+- E6-A Evaluation Foundation 在 E1 核心 Trace 后启动，不再等待 E4/E5。
+- 既有文档的历史归属暂不在本文件更新中强制调整；后续新增文档必须遵守本规则。
+
+> [!warning] 维护底线
+> 不要因为文档“看起来可以归类”就随意删除或覆盖。移动/重命名已有文档前，先确认内容、修复链接，并使用 Git 保留历史；纯粹更新规则时，只修改本 README 即可。
