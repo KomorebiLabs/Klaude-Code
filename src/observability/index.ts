@@ -23,5 +23,26 @@ export {
   createQueryFinishedPayload,
   createQueryStartedPayload,
 } from "./queryLifecycle.js";
+export {
+  createModelCompletedPayload,
+  createModelFailedPayload,
+  createModelRequestedPayload,
+  createRetryScheduledPayload,
+  createStreamRestartedPayload,
+} from "./modelLifecycle.js";
+export {
+  createPermissionRequestedPayload,
+  createPermissionResolvedPayload,
+  createToolExceptionPayload,
+  createToolFinishedPayload,
+  createToolStartedPayload,
+  type PermissionDecisionSource,
+} from "./toolLifecycle.js";
+export {
+  createTraceTimeline,
+  formatTraceTimeline,
+  inspectTraceFile,
+  type TraceTimelineEntry,
+} from "./traceInspector.js";
 export { readTraceEvents } from "./traceReader.js";
 export { getTracePath } from "../session/storage.js";

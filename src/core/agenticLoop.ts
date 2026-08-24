@@ -4,6 +4,7 @@
 
 import type Anthropic from "@anthropic-ai/sdk";
 import type { MessageParam } from "@anthropic-ai/sdk/resources/messages.js";
+import { randomUUID } from "node:crypto";
 import {
   checkPermission,
   type PermissionDecision,
@@ -29,6 +30,19 @@ import { setToolStatus } from "../state/toolStatusStore.js";
 import * as path from "node:path";
 import { isAtBlockingLimit, calculateTokenWarningState, type TokenWarningResult } from "../context/autoCompact.js";
 import type { ContentBlock, TextBlock, ToolUseBlock, Usage } from "../types/message.js";
+import type { HarnessTraceEventType, TraceSink } from "../observability/index.js";
+import {
+  createModelCompletedPayload,
+  createModelFailedPayload,
+  createModelRequestedPayload,
+  createRetryScheduledPayload,
+  createStreamRestartedPayload,
+  createPermissionRequestedPayload,
+  createPermissionResolvedPayload,
+  createToolExceptionPayload,
+  createToolFinishedPayload,
+  createToolStartedPayload,
+} from "../observability/index.js";
 import {
   runPreToolUseHooks,
   runPostToolUseHooks,
@@ -181,6 +195,10 @@ export interface QueryParams {
    * own id + type so SubagentStop hooks fire per-agent.
    */
   subagentInfo?: { agentId: string; agentType: string };
+  /** Optional diagnostic Trace. Legacy and sub-agent callers may omit it. */
+  traceSink?: TraceSink;
+  /** Narrow dependency seam for deterministic lifecycle verification. */
+  streamMessageImpl?: typeof streamMessage;
 }
 
 export interface RunToolsOptions {
@@ -198,6 +216,21 @@ export interface RunToolsOptions {
   conversationMessages?: MessageParam[];
   /** Active model handle, forwarded to the Auto Mode classifier. */
   model?: string;
+  /** Optional diagnostic Trace propagated from the active Query. */
+  traceSink?: TraceSink;
+}
+
+function emitTrace(
+  sink: TraceSink | undefined,
+  eventType: HarnessTraceEventType,
+  payload: Record<string, unknown>,
+  spanId?: string,
+): void {
+  try {
+    sink?.emit(eventType, payload, spanId ? { spanId } : undefined);
+  } catch {
+    // Diagnostic instrumentation must never alter the Agent main path.
+  }
 }
 
 /**
@@ -321,6 +354,9 @@ async function runOneToolBlock(
     };
   }
 
+  const toolSpanId = randomUUID();
+  let toolStartedAt: number | undefined;
+
   try {
     // ─── Stage 22: PreToolUse hooks ────────────────────────────────
     // Fire user-defined PreToolUse hooks BEFORE the permission check.
@@ -341,6 +377,18 @@ async function runOneToolBlock(
     });
 
     if (preOutcome.blockingError) {
+      emitTrace(
+        options.traceSink,
+        "permission.resolved",
+        createPermissionResolvedPayload({
+          toolName: block.name,
+          toolUseId: block.id,
+          decision: "deny",
+          source: "pre_tool_hook",
+          prompted: false,
+        }),
+        toolSpanId,
+      );
       const reason = preOutcome.blockingError;
       const result: ToolResult = {
         content: `Blocked by PreToolUse hook: ${reason}`,
@@ -368,18 +416,21 @@ async function runOneToolBlock(
       messages: options.conversationMessages,
       model: options.model,
     });
+    let permissionSource: "permission_engine" | "pre_tool_hook" = "permission_engine";
 
     // PreToolUse hook can override the rule-based decision (source's
     // `permissionBehavior` from `processHookJSONOutput`). `deny` we
     // handle above as `blockingError`; `allow` short-circuits the
     // permission flow; `ask` upgrades a would-be `allow` into a prompt.
     if (preOutcome.permissionBehavior === "allow") {
+      permissionSource = "pre_tool_hook";
       permission = {
         ...permission,
         behavior: "allow",
         reason: preOutcome.permissionDecisionReason || "Allowed by PreToolUse hook",
       };
     } else if (preOutcome.permissionBehavior === "ask" && permission.behavior !== "deny") {
+      permissionSource = "pre_tool_hook";
       permission = {
         ...permission,
         behavior: "ask",
@@ -388,6 +439,18 @@ async function runOneToolBlock(
     }
 
     if (permission.behavior === "deny") {
+      emitTrace(
+        options.traceSink,
+        "permission.resolved",
+        createPermissionResolvedPayload({
+          toolName: block.name,
+          toolUseId: block.id,
+          decision: "deny",
+          source: permissionSource,
+          prompted: false,
+        }),
+        toolSpanId,
+      );
       const result: ToolResult = {
         content: `Permission denied for ${block.name}: ${permission.reason}`,
         isError: true,
@@ -416,16 +479,47 @@ async function runOneToolBlock(
       // pop a prompt in the parent's UI — see agentTool.ts for the long
       // list of failure modes that causes.
       let decision: PermissionDecision;
+      let decisionSource: "user" | "headless" | "default_deny";
+      let prompted = false;
       if (options.shouldAvoidPermissionPrompts === true) {
         decision = "deny";
+        decisionSource = "headless";
       } else {
         // Mark this specific card as blocked on the user's approval so the
         // UI can show "Waiting for permission…" on it (not just the prompt).
         setToolStatus(block.id, "waiting-permission");
-        decision = options.onPermissionRequest
-          ? await options.onPermissionRequest(permission.request)
-          : "deny";
+        if (options.onPermissionRequest) {
+          prompted = true;
+          decisionSource = "user";
+          emitTrace(
+            options.traceSink,
+            "permission.requested",
+            createPermissionRequestedPayload({
+              toolName: block.name,
+              toolUseId: block.id,
+              toolInput,
+            }),
+            toolSpanId,
+          );
+          decision = await options.onPermissionRequest(permission.request);
+        } else {
+          decisionSource = "default_deny";
+          decision = "deny";
+        }
       }
+
+      emitTrace(
+        options.traceSink,
+        "permission.resolved",
+        createPermissionResolvedPayload({
+          toolName: block.name,
+          toolUseId: block.id,
+          decision: decision === "deny" ? "deny" : "allow",
+          source: decisionSource,
+          prompted,
+        }),
+        toolSpanId,
+      );
 
       if (decision === "deny") {
         const denialMessage = options.shouldAvoidPermissionPrompts === true
@@ -447,6 +541,19 @@ async function runOneToolBlock(
           allowRules.push(permission.request.ruleHint);
         }
       }
+    } else {
+      emitTrace(
+        options.traceSink,
+        "permission.resolved",
+        createPermissionResolvedPayload({
+          toolName: block.name,
+          toolUseId: block.id,
+          decision: "allow",
+          source: permissionSource,
+          prompted: false,
+        }),
+        toolSpanId,
+      );
     }
 
     // Stamp the tool_use id onto the per-call context so tools that
@@ -473,6 +580,13 @@ async function runOneToolBlock(
 
     // Permission cleared (or never needed) — the tool is now executing.
     setToolStatus(block.id, "running");
+    toolStartedAt = performance.now();
+    emitTrace(
+      options.traceSink,
+      "tool.started",
+      createToolStartedPayload({ toolName: block.name, toolUseId: block.id, toolInput }),
+      toolSpanId,
+    );
     const rawResult = await tool.call(toolInput, callContext);
     let result: ToolResult = {
       ...rawResult,
@@ -529,11 +643,36 @@ async function runOneToolBlock(
       };
     }
 
+    emitTrace(
+      options.traceSink,
+      result.isError ? "tool.failed" : "tool.completed",
+      createToolFinishedPayload({
+        toolName: block.name,
+        toolUseId: block.id,
+        result,
+        durationMs: performance.now() - toolStartedAt,
+      }),
+      toolSpanId,
+    );
+
     return {
       execution: { toolUseId: block.id, toolName: block.name, toolInput, result },
       ...(surfacedRequest ? { permissionRequest: surfacedRequest } : {}),
     };
   } catch (error: unknown) {
+    if (toolStartedAt !== undefined) {
+      emitTrace(
+        options.traceSink,
+        "tool.failed",
+        createToolExceptionPayload({
+          toolName: block.name,
+          toolUseId: block.id,
+          error,
+          durationMs: performance.now() - toolStartedAt,
+        }),
+        toolSpanId,
+      );
+    }
     const errorMessage = error instanceof Error
       ? (error.stack ?? error.message)
       : String(error);
@@ -706,7 +845,21 @@ export async function* query(
     }
 
     const currentTools = params.getTools ? params.getTools() : params.tools;
-    const stream = streamMessage({
+    const requestSpanId = randomUUID();
+    const requestStartedAt = performance.now();
+    emitTrace(
+      params.traceSink,
+      "model.requested",
+      createModelRequestedPayload({
+        model: params.model,
+        turnId: nextTurnCount,
+        messageCount: state.messages.length,
+        toolCount: currentTools?.length ?? 0,
+        maxTokensOverridden: maxOutputTokensOverride !== undefined,
+      }),
+      requestSpanId,
+    );
+    const stream = (params.streamMessageImpl ?? streamMessage)({
       messages: [...state.messages],
       model: params.model,
       system: params.systemPrompt,
@@ -728,6 +881,17 @@ export async function* query(
       if (done) {
         const streamResult = value;
         if (!streamResult) {
+          emitTrace(
+            params.traceSink,
+            "model.failed",
+            createModelFailedPayload({
+              turnId: nextTurnCount,
+              error: new Error("Model stream returned no result."),
+              errorCategory: "empty_result",
+              durationMs: performance.now() - requestStartedAt,
+            }),
+            requestSpanId,
+          );
           yield { type: "turn_complete", reason: "model_error", turnCount: nextTurnCount };
           return {
             state: { ...state, turnCount: nextTurnCount },
@@ -746,6 +910,18 @@ export async function* query(
           (totalUsage.cache_read_input_tokens ?? 0) + (streamResult.usage.cache_read_input_tokens ?? 0);
         assistantContent = streamResult.assistantMessage.content as ContentBlock[];
         stopReason = streamResult.stopReason;
+        emitTrace(
+          params.traceSink,
+          "model.completed",
+          createModelCompletedPayload({
+            turnId: nextTurnCount,
+            stopReason,
+            usage: streamResult.usage,
+            blockTypes: assistantContent.map((block) => block.type),
+            durationMs: performance.now() - requestStartedAt,
+          }),
+          requestSpanId,
+        );
         break;
       }
 
@@ -760,6 +936,18 @@ export async function* query(
           // The API layer is backing off before re-issuing the request.
           // Surface it so the UI can show the countdown; no content was
           // streamed yet, so nothing needs clearing.
+          emitTrace(
+            params.traceSink,
+            "retry.scheduled",
+            createRetryScheduledPayload({
+              turnId: nextTurnCount,
+              attempt: value.attempt,
+              maxRetries: value.maxRetries,
+              delayMs: value.delayMs,
+              errorCategory: value.category,
+            }),
+            requestSpanId,
+          );
           yield {
             type: "api_retry",
             attempt: value.attempt,
@@ -801,6 +989,12 @@ export async function* query(
             };
             // Clear any partially-streamed text and reset token override.
             maxOutputTokensOverride = undefined;
+            emitTrace(
+              params.traceSink,
+              "stream.restarted",
+              createStreamRestartedPayload({ turnId: nextTurnCount, reason: "reactive_compact" }),
+              requestSpanId,
+            );
             yield { type: "stream_restart", reason: "reactive_compact" };
             continue;
           }
@@ -809,6 +1003,17 @@ export async function* query(
         }
       }
 
+      emitTrace(
+        params.traceSink,
+        "model.failed",
+        createModelFailedPayload({
+          turnId: nextTurnCount,
+          error: streamError.error,
+          errorCategory: streamError.category,
+          durationMs: performance.now() - requestStartedAt,
+        }),
+        requestSpanId,
+      );
       yield { type: "error", error: streamError.error };
       yield { type: "turn_complete", reason: "model_error", turnCount: nextTurnCount };
       return {
@@ -825,6 +1030,12 @@ export async function* query(
       // touching the message history. Fires once per truncation episode.
       if (maxOutputTokensOverride === undefined) {
         maxOutputTokensOverride = ESCALATED_MAX_TOKENS;
+        emitTrace(
+          params.traceSink,
+          "stream.restarted",
+          createStreamRestartedPayload({ turnId: nextTurnCount, reason: "max_tokens_escalation" }),
+          requestSpanId,
+        );
         yield { type: "stream_restart", reason: "max_tokens_escalation" };
         continue; // turnCount unchanged — same turn, higher cap
       }
@@ -958,6 +1169,7 @@ export async function* query(
         shouldAvoidPermissionPrompts: params.shouldAvoidPermissionPrompts,
         conversationMessages: state.messages,
         model: params.model,
+        traceSink: params.traceSink,
       },
     );
 
