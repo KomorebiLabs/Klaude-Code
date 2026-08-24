@@ -13,7 +13,7 @@
     "start": "node dist/entrypoint/cli.js",
     "test:trace": "tsx src/scripts/test-trace.ts",
     "test:evaluation": "tsx src/scripts/test-evaluation.ts",
-    "verify:core": "npm run build && npm run test:trace && npm run test:evaluation && npm run test:resilience && npm run test:recovery-lifecycle && npm run test:tool-permission-contract && npm run test:providerstream && tsx src/scripts/verify-core.ts",
+    "verify:core": "npm run build && npm run test:trace && npm run test:evaluation && npm run test:resilience && npm run test:recovery-lifecycle && npm run test:tool-permission-contract && npm run test:external-safety && npm run test:providerstream && tsx src/scripts/verify-core.ts",
     "inspect:trace": "tsx src/scripts/inspect-trace.ts",
     "test:queryengine": "tsx src/scripts/test-queryengine-characterization.ts",
     "test:providerstream": "tsx src/scripts/test-providerstream-characterization.ts",
@@ -57,6 +57,7 @@
     "test:resilience": "tsx src/scripts/smoke-resilience.ts",
     "test:recovery-lifecycle": "tsx src/scripts/test-recovery-lifecycle.ts",
     "test:tool-permission-contract": "tsx src/scripts/test-tool-permission-contract.ts",
+    "test:external-safety": "tsx src/scripts/test-external-safety-contract.ts",
     "smoke:sandbox": "tsx src/scripts/smoke-sandbox.ts",
     "smoke:bash-sandbox": "tsx src/scripts/smoke-bash-sandbox.ts"
   },

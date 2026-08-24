@@ -1,5 +1,8 @@
-import { spawn } from "node:child_process";
 import type { Tool, ToolContext, ToolResult } from "./Tool.js";
+import {
+  normalizeToolTimeout,
+  runManagedProcess,
+} from "./processLifecycle.js";
 import {
   annotateStderrWithSandboxFailures,
   buildSandboxProfile,
@@ -14,6 +17,7 @@ import {
   startBashProgress,
 } from "../state/bashProgressStore.js";
 import { readMergedEnv } from "../utils/settings.js";
+import { createSafeDiagnosticMessage } from "../observability/redaction.js";
 
 interface BashInput {
   command: string;
@@ -51,8 +55,6 @@ async function buildProfileForCwd(
   });
 }
 
-const DEFAULT_TIMEOUT_MS = 120_000;
-const MAX_OUTPUT_CHARS = 30_000;
 const READ_ONLY_COMMANDS = new Set([
   "ls",
   "cat",
@@ -71,11 +73,6 @@ const READ_ONLY_COMMANDS = new Set([
   "wc",
   "sed",
 ]);
-
-function truncateOutput(value: string): string {
-  if (value.length <= MAX_OUTPUT_CHARS) return value;
-  return `${value.slice(0, MAX_OUTPUT_CHARS)}\n...[truncated ${value.length - MAX_OUTPUT_CHARS} chars]`;
-}
 
 function splitCommandSegments(command: string): string[] {
   return command
@@ -99,6 +96,11 @@ export function isReadOnlyCommand(command: string): boolean {
 
 export const bashTool: Tool = {
   name: "Bash",
+  externalSource: {
+    kind: "process",
+    sourceName: "local",
+    operationName: "shell",
+  },
   description: "Execute a shell command in the current working directory and return stdout/stderr.",
   inputSchema: {
     type: "object" as const,
@@ -119,7 +121,7 @@ export const bashTool: Tool = {
       return { content: "Error: command is required", isError: true };
     }
 
-    const timeoutMs = typeof input.timeout === "number" ? input.timeout : DEFAULT_TIMEOUT_MS;
+    const timeoutMs = normalizeToolTimeout(input.timeout);
 
     // Decide sandbox wrapping. We swallow load errors and proceed with
     // sandboxing OFF — settings.json being unparseable shouldn't block
@@ -167,74 +169,77 @@ export const bashTool: Tool = {
       settingsEnv = {};
     }
 
-    return await new Promise<ToolResult>((resolve) => {
-      const child = spawn(process.env.SHELL || "bash", ["-lc", executedCommand], {
-        cwd: context.cwd,
-        env: { ...process.env, ...settingsEnv },
-      });
-
-      let stdout = "";
-      let stderr = "";
-      let settled = false;
-
-      const finish = (result: ToolResult) => {
-        if (settled) return;
-        settled = true;
-        if (progressId) completeBashProgress(progressId);
-        resolve(result);
-      };
-
-      const timeoutId = setTimeout(() => {
-        child.kill("SIGTERM");
-        finish({ content: `Command timed out after ${timeoutMs}ms`, isError: true });
-      }, timeoutMs);
-
-      const onAbort = () => {
-        child.kill("SIGTERM");
-        clearTimeout(timeoutId);
-        finish({ content: "Command aborted", isError: true });
-      };
-
-      context.abortSignal?.addEventListener("abort", onAbort, { once: true });
-
-      child.stdout.on("data", (chunk: Buffer | string) => {
-        const text = chunk.toString();
-        stdout += text;
-        if (progressId) appendBashProgress(progressId, text);
-      });
-      child.stderr.on("data", (chunk: Buffer | string) => {
-        const text = chunk.toString();
-        stderr += text;
-        if (progressId) appendBashProgress(progressId, text);
-      });
-      child.on("error", (error) => {
-        clearTimeout(timeoutId);
-        finish({ content: `Failed to start command: ${error.message}`, isError: true });
-      });
-      child.on("close", (code) => {
-        clearTimeout(timeoutId);
-        context.abortSignal?.removeEventListener("abort", onAbort);
-
-        // Tag stderr with <sandbox_violations>...</sandbox_violations>
-        // when the failure smells like a sandbox denial. The model uses
-        // this signal to decide whether to retry, ask for permission,
-        // or back off. The UI strips the tag before rendering.
-        const annotatedStderr = willSandbox
-          ? annotateStderrWithSandboxFailures(stderr, code)
-          : stderr;
-
-        const output = [
-          `Command: ${input.command}`,
-          `Read-only: ${isReadOnlyCommand(input.command)}`,
-          `Sandbox: ${willSandbox ? "enabled" : "disabled"}`,
-          `Exit code: ${code ?? -1}`,
-          stdout ? `\nSTDOUT:\n${truncateOutput(stdout)}` : "",
-          annotatedStderr ? `\nSTDERR:\n${truncateOutput(annotatedStderr)}` : "",
-        ].filter(Boolean).join("\n");
-
-        finish({ content: output, isError: (code ?? 1) !== 0 });
-      });
+    const execution = await runManagedProcess({
+      executable: process.env.SHELL || "bash",
+      args: ["-lc", executedCommand],
+      cwd: context.cwd,
+      env: { ...process.env, ...settingsEnv },
+      timeoutMs,
+      abortSignal: context.abortSignal,
+      onStdout: progressId
+        ? (text) => appendBashProgress(progressId, text)
+        : undefined,
+      onStderr: progressId
+        ? (text) => appendBashProgress(progressId, text)
+        : undefined,
     });
+    if (progressId) completeBashProgress(progressId);
+
+    if (execution.status === "timeout") {
+      return {
+        content: `Command timed out after ${timeoutMs}ms (termination: ${execution.termination})`,
+        isError: true,
+        diagnostics: {
+          termination: execution.termination === "degraded" ? "degraded" : "timeout",
+          sandboxState: willSandbox ? "enabled" : "disabled",
+        },
+      };
+    }
+    if (execution.status === "aborted") {
+      return {
+        content: `Command aborted (termination: ${execution.termination})`,
+        isError: true,
+        diagnostics: {
+          termination: execution.termination === "degraded" ? "degraded" : "aborted",
+          sandboxState: willSandbox ? "enabled" : "disabled",
+        },
+      };
+    }
+    if (execution.status === "spawn_error") {
+      return {
+        content: `Failed to start command: ${createSafeDiagnosticMessage(execution.errorMessage)}`,
+        isError: true,
+        diagnostics: {
+          termination: "degraded",
+          sandboxState: willSandbox ? "enabled" : "disabled",
+        },
+      };
+    }
+
+    // Tag stderr with <sandbox_violations>...</sandbox_violations>
+    // when the failure smells like a sandbox denial. The model uses
+    // this signal to decide whether to retry, ask for permission,
+    // or back off. The UI strips the tag before rendering.
+    const annotatedStderr = willSandbox
+      ? annotateStderrWithSandboxFailures(execution.stderr, execution.exitCode)
+      : execution.stderr;
+    const output = [
+      `Command: ${input.command}`,
+      `Read-only: ${isReadOnlyCommand(input.command)}`,
+      `Sandbox: ${willSandbox ? "enabled" : "disabled"}`,
+      `Exit code: ${execution.exitCode ?? -1}`,
+      execution.stdout ? `\nSTDOUT:\n${execution.stdout}` : "",
+      annotatedStderr ? `\nSTDERR:\n${annotatedStderr}` : "",
+    ].filter(Boolean).join("\n");
+
+    return {
+      content: output,
+      isError: (execution.exitCode ?? 1) !== 0,
+      diagnostics: {
+        termination: "completed",
+        sandboxState: willSandbox ? "enabled" : "disabled",
+      },
+    };
   },
   isReadOnly(): boolean {
     return false;

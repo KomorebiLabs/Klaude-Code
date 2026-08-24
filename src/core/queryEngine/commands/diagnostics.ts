@@ -26,6 +26,10 @@ import {
   loadSandboxSettings,
 } from "../../../sandbox/index.js";
 import { loadSettingsDiagnostics } from "../../../utils/settings.js";
+import {
+  createSafeDiagnosticMessage,
+  createSafeUrlSummary,
+} from "../../../observability/redaction.js";
 import type { QueryEngineEvent } from "../types.js";
 import type { CommandContext } from "./context.js";
 
@@ -181,10 +185,12 @@ export async function* handleDoctorCommand(
 
   // Endpoint + reachability
   const baseURL = process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com";
-  lines.push(`  Endpoint: ${baseURL}`);
+  lines.push(`  Endpoint: ${createSafeUrlSummary(baseURL)}`);
   const reach = await probeEndpoint(baseURL);
   if (reach.ok) lines.push(`${ICON.ok} Endpoint reachable (HTTP ${reach.status})`);
-  else lines.push(`${ICON.warn} Endpoint not reachable: ${reach.error}`);
+  else lines.push(
+    `${ICON.warn} Endpoint not reachable: ${createSafeDiagnosticMessage(reach.error)}`,
+  );
 
   // MCP servers
   const mcp = getMcpRegistry();
@@ -193,7 +199,11 @@ export async function* handleDoctorCommand(
   } else {
     for (const { connection } of mcp) {
       if (connection.type === "connected") lines.push(`${ICON.ok} MCP ${connection.name}: connected`);
-      else if (connection.type === "failed") lines.push(`${ICON.fail} MCP ${connection.name}: ${connection.error}`);
+      else if (connection.type === "failed") {
+        lines.push(
+          `${ICON.fail} MCP ${connection.name}: ${createSafeDiagnosticMessage(connection.error)}`,
+        );
+      }
       else if (connection.type === "pending") lines.push(`${ICON.warn} MCP ${connection.name}: connecting…`);
       else lines.push(`${ICON.warn} MCP ${connection.name}: disabled`);
     }

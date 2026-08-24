@@ -5,7 +5,12 @@ import {
 import type { Tool, ToolContext, ToolResult } from "./Tool.js";
 import { getMcpRegistry } from "../services/mcp/registry.js";
 import type { ConnectedMcpServer } from "../types/mcp.js";
+import { createSafeMessage } from "../observability/redaction.js";
 import { logWarn } from "../utils/log.js";
+import {
+  createMcpRequestOptions,
+  serializeBoundedMcpJsonArray,
+} from "../services/mcp/safety.js";
 
 /**
  * ListMcpResources — list resources exposed by connected MCP servers.
@@ -45,7 +50,7 @@ export const listMcpResourcesTool: Tool = {
     required: [],
   },
   maxResultSizeChars: 100_000,
-  async call(rawInput: Record<string, unknown>, _context: ToolContext): Promise<ToolResult> {
+  async call(rawInput: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
     const input = rawInput as unknown as ListMcpResourcesInput;
     const all = connectedServers();
     const targets = input.server ? all.filter((c) => c.name === input.server) : all;
@@ -65,6 +70,7 @@ export const listMcpResourcesTool: Tool = {
         const result = (await server.client.request(
           { method: "resources/list" },
           ListResourcesResultSchema,
+          createMcpRequestOptions(context.abortSignal),
         )) as ListResourcesResult;
         for (const r of result.resources) {
           entries.push({
@@ -77,7 +83,9 @@ export const listMcpResourcesTool: Tool = {
         }
       } catch (error) {
         // One server failing shouldn't sink the whole list.
-        logWarn(`MCP server '${server.name}' resources/list failed: ${(error as Error).message}`);
+        logWarn(
+          `MCP server '${server.name}' resources/list failed: ${createSafeMessage(error)}`,
+        );
       }
     }
 
@@ -88,7 +96,16 @@ export const listMcpResourcesTool: Tool = {
       };
     }
 
-    return { content: JSON.stringify(entries, null, 2) };
+    const boundedEntries = entries.map((entry) => ({
+      uri: entry.uri.slice(0, 4_096),
+      name: entry.name.slice(0, 4_096),
+      ...(entry.mimeType ? { mimeType: entry.mimeType.slice(0, 256) } : {}),
+      ...(entry.description
+        ? { description: entry.description.slice(0, 4_096) }
+        : {}),
+      server: entry.server.slice(0, 256),
+    }));
+    return { content: serializeBoundedMcpJsonArray(boundedEntries) };
   },
   isReadOnly(): boolean {
     return true;

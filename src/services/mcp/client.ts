@@ -30,6 +30,10 @@ import type {
   ScopedMcpServerConfig,
 } from "../../types/mcp.js";
 import { debugLog, logWarn } from "../../utils/log.js";
+import {
+  createSafeDiagnosticMessage,
+  createSafeUrlSummary,
+} from "../../observability/redaction.js";
 
 // ─── Connect timeout ─────────────────────────────────────────────────
 
@@ -167,10 +171,8 @@ export function connectToServer(
  */
 interface TransportBundle {
   transport: Transport;
-  /** Diagnostic prefix for this transport (e.g. "stdio: npx -y …"). */
+  /** Secret-free diagnostic transport summary. */
   describe: string;
-  /** Buffered stderr — only stdio populates this. */
-  collectStderrTail: () => string;
   /**
    * Transport-specific shutdown step run BEFORE `client.close()`. For stdio
    * this is the SIGINT→SIGTERM→SIGKILL escalation; for remote it's a no-op
@@ -194,19 +196,15 @@ function createStdioTransport(
     stderr: "pipe", // keep server stderr off our terminal UI
   });
 
-  let stderrBuf = "";
+  // Drain server stderr so a noisy child cannot block on a full pipe. Raw
+  // server output is intentionally neither retained nor copied to diagnostics.
   if (transport.stderr) {
-    transport.stderr.on("data", (chunk: Buffer) => {
-      if (stderrBuf.length < 64 * 1024) {
-        stderrBuf += chunk.toString();
-      }
-    });
+    transport.stderr.on("data", () => undefined);
   }
 
   return {
     transport,
-    describe: `stdio: ${config.command} ${(config.args ?? []).join(" ")}`.trim(),
-    collectStderrTail: () => stderrBuf,
+    describe: "stdio",
     preCleanup: async () => {
       const pid: number | undefined = (transport as { pid?: number }).pid;
       await escalatedKill(name, pid);
@@ -229,8 +227,7 @@ function createHttpTransport(config: McpHTTPServerConfig & { scope: string }): T
   });
   return {
     transport,
-    describe: `http: ${config.url}`,
-    collectStderrTail: () => "",
+    describe: `http: ${createSafeUrlSummary(config.url)}`,
     preCleanup: async () => { /* http: client.close() handles it */ },
   };
 }
@@ -264,8 +261,7 @@ function createSseTransport(config: McpSSEServerConfig & { scope: string }): Tra
   });
   return {
     transport,
-    describe: `sse: ${config.url}`,
-    collectStderrTail: () => "",
+    describe: `sse: ${createSafeUrlSummary(config.url)}`,
     preCleanup: async () => { /* sse: client.close() handles it */ },
   };
 }
@@ -276,8 +272,8 @@ async function doConnect(
 ): Promise<McpServerConnection> {
   const summary =
     config.type === "http" || config.type === "sse"
-      ? `${config.type} ${config.url}`
-      : `stdio ${config.command} ${(config.args ?? []).join(" ")}`.trim();
+      ? `${config.type} ${createSafeUrlSummary(config.url)}`
+      : "stdio";
   debugLog("mcp", `[${name}] connecting (${summary})`);
 
   let bundle: TransportBundle;
@@ -290,9 +286,14 @@ async function doConnect(
       bundle = createStdioTransport(name, config);
     }
   } catch (error) {
-    const err = (error as Error).message;
-    logWarn(`MCP server '${name}' failed to initialize transport: ${err}`);
-    return { name, type: "failed", config, error: err };
+    const safeError = createSafeDiagnosticMessage(error);
+    logWarn(`MCP server '${name}' failed to initialize transport: ${safeError}`);
+    return {
+      name,
+      type: "failed",
+      config,
+      error: "Transport initialization failed; inspect the MCP configuration.",
+    };
   }
 
   const client = new Client(
@@ -321,9 +322,10 @@ async function doConnect(
     await Promise.race([connectPromise, timeoutPromise]);
   } catch (error) {
     if (timeoutHandle) clearTimeout(timeoutHandle);
-    const errMsg = (error as Error).message;
-    const stderrTail = bundle.collectStderrTail();
-    const detail = stderrTail ? `${errMsg} (stderr: ${stderrTail.slice(0, 200).trim()})` : errMsg;
+    const timedOut = (error as Error).message.includes("connection timed out");
+    const detail = timedOut
+      ? `Connection timed out after ${timeoutMs}ms.`
+      : "Connection failed; inspect server configuration and credentials.";
     logWarn(`MCP server '${name}' failed to connect: ${detail}`);
     try {
       await bundle.transport.close();

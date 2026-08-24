@@ -1,3 +1,5 @@
+import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import { getEasyAgentHome } from "../utils/paths.js";
 
@@ -31,27 +33,47 @@ export function describeAllowedRoots(cwd: string): string {
 }
 
 export function expandHome(filePath: string): string {
-  return filePath.startsWith("~")
-    ? filePath.replace("~", process.env.HOME || "")
-    : filePath;
+  if (filePath === "~") return os.homedir();
+  if (filePath.startsWith("~/") || filePath.startsWith("~\\")) {
+    return path.join(os.homedir(), filePath.slice(2));
+  }
+  return filePath;
 }
 
 export function resolveSafePath(filePath: string, cwd: string): string {
   return path.resolve(cwd, expandHome(filePath));
 }
 
+/**
+ * Resolve symlinks/junctions for the existing portion of a path. The remaining
+ * suffix is retained so callers can safely validate files that do not exist yet.
+ */
+function canonicalizeWithExistingAncestor(candidate: string): string {
+  let existingAncestor = path.resolve(candidate);
+  const missingSegments: string[] = [];
+
+  while (!fs.existsSync(existingAncestor)) {
+    const parent = path.dirname(existingAncestor);
+    if (parent === existingAncestor) break;
+    missingSegments.unshift(path.basename(existingAncestor));
+    existingAncestor = parent;
+  }
+
+  const canonicalAncestor = fs.realpathSync.native(existingAncestor);
+  return path.resolve(canonicalAncestor, ...missingSegments);
+}
+
 export function ensureInsideAllowedRoots(resolvedPath: string, cwd: string): void {
-  const normalizedPath = path.resolve(resolvedPath);
+  const canonicalPath = canonicalizeWithExistingAncestor(resolvedPath);
   for (const root of getToolAllowedRoots(cwd)) {
-    const relative = path.relative(root, normalizedPath);
+    const canonicalRoot = canonicalizeWithExistingAncestor(root);
+    const relative = path.relative(canonicalRoot, canonicalPath);
     if (relative === "" || relative === ".") return;
     if (!relative.startsWith("..") && !path.isAbsolute(relative)) {
       return;
     }
   }
-  throw new Error(
-    `Path is outside the allowed roots: ${resolvedPath}. Allowed roots: ${describeAllowedRoots(cwd)}`,
-  );
+  throw new Error("Path is outside the allowed roots.");
 }
 
 export function resolveWorkspacePath(filePath: string, cwd: string): string {
