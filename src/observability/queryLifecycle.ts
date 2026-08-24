@@ -37,10 +37,34 @@ export function createQueryFinishedPayload(input: QueryFinishedPayloadInput): Re
   };
 }
 
-export function createQueryFailedPayload(error: unknown): Record<string, unknown> {
+export function getQueryTerminalEventType(
+  reason: string,
+): "query.finished" | "query.aborted" | "query.failed" {
+  if (reason === "aborted") return "query.aborted";
+  if (reason === "timeout" || reason === "model_error") return "query.failed";
+  return "query.finished";
+}
+
+export function createQueryFailedPayload(
+  error: unknown,
+  context?: {
+    reason?: "timeout" | "model_error";
+    errorCategory?: "api_timeout" | "model_error";
+  },
+): Record<string, unknown> {
+  const reason = context?.reason === "timeout" || context?.reason === "model_error"
+    ? context.reason
+    : undefined;
+  const contextualCategory = context?.errorCategory === "api_timeout" || context?.errorCategory === "model_error"
+    ? context.errorCategory
+    : undefined;
+  const errorCategory = contextualCategory ?? (error instanceof Error ? error.name : typeof error);
   return {
-    errorCategory: error instanceof Error ? error.name : typeof error,
-    error: createSafeMessage(error),
+    ...(reason ? { reason } : {}),
+    errorCategory,
+    error: reason
+      ? `Query failed (${errorCategory}).`
+      : createSafeMessage(error),
   };
 }
 

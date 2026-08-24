@@ -173,9 +173,9 @@ status: historical-reference
 
 ## 当前状态
 
-- PR-00～PR-04：路线修复、Trace Storage、Model/Retry/Stream、Tool/Permission、Inspector 与 Evaluation Foundation 已合并。
-- PR-05 / R1-E Error Taxonomy / Retry / Provider：当前已实现阶段，待 PR 审查与合并。
-- 合并后下一候选是 PR-06 / R1-F Streaming / Abort / Context Recovery；未经单独授权不得启动。
+- PR-00～PR-05：路线修复、Trace Storage、Model/Retry/Stream、Tool/Permission、Inspector、Evaluation Foundation 与 Provider Retry Semantics 已合并。
+- PR-06 / R1-F Streaming / Abort / Context Recovery：当前已实现阶段，待 PR 审查与合并。
+- 合并后下一候选是 PR-07 / R1-G Tool / Permission Safety Contract；未经单独授权不得启动。
 - 既有文档的历史归属暂不在本文件更新中强制调整；后续新增文档必须遵守本规则。
 
 > [!warning] 维护底线

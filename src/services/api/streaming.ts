@@ -40,6 +40,7 @@ import {
   sleep,
   type QuerySource,
 } from "./withRetry.js";
+import { RequestAbortedError, createRequestLifecycle } from "./requestLifecycle.js";
 
 // ─── Request Parameters ────────────────────────────────────────────
 
@@ -57,12 +58,16 @@ export interface StreamRequestParams {
    */
   toolChoice?: Anthropic.MessageCreateParams["tool_choice"];
   signal?: AbortSignal;
+  /** Per-attempt model deadline. Defaults to EASY_AGENT_MODEL_TIMEOUT_MS/10m. */
+  timeoutMs?: number;
   /**
    * Stage 27: foreground (user waiting) vs background (summary / title).
    * Controls whether a 529 capacity overload is retried. Defaults to
    * foreground when unset — conservative for untagged paths.
    */
   querySource?: QuerySource;
+  /** Narrow deterministic-test seam; production callers leave this undefined. */
+  streamAttemptImpl?: StreamAttempt;
 }
 
 // ─── Streaming Result ──────────────────────────────────────────────
@@ -72,6 +77,10 @@ export interface StreamResult {
   usage: Usage;
   stopReason: string;
 }
+
+export type StreamAttempt = (
+  params: StreamRequestParams,
+) => AsyncGenerator<StreamEvent, StreamResult>;
 
 // ─── Core Streaming Function ───────────────────────────────────────
 
@@ -341,10 +350,40 @@ export async function* streamMessage(
   let consecutive529 = 0;
   let spentDelayMs = 0;
 
+  if (params.signal?.aborted) {
+    const lifecycle = createRequestLifecycle({
+      parentSignal: params.signal,
+      timeoutMs: params.timeoutMs,
+    });
+    const error = lifecycle.normalizeError(params.signal.reason);
+    lifecycle.dispose();
+    yield {
+      type: "error",
+      error: error instanceof Error ? error : new Error("Request was aborted."),
+      category: "aborted",
+      outputStarted: false,
+    };
+    return errorStreamResult();
+  }
+
   // eslint-disable-next-line no-constant-condition
   while (true) {
+    if (params.signal?.aborted) {
+      yield {
+        type: "error",
+        error: new RequestAbortedError(),
+        category: "aborted",
+        outputStarted: false,
+      };
+      return errorStreamResult();
+    }
     attempt++;
-    const inner = streamOnce(params);
+    const lifecycle = createRequestLifecycle({
+      parentSignal: params.signal,
+      timeoutMs: params.timeoutMs,
+    });
+    const attemptImpl = params.streamAttemptImpl ?? streamOnce;
+    const inner = attemptImpl({ ...params, signal: lifecycle.signal });
     let hasYieldedContent = false;
 
     try {
@@ -362,7 +401,9 @@ export async function* streamMessage(
         }
         yield value;
       }
-    } catch (error) {
+    } catch (caughtError) {
+      const error = lifecycle.normalizeError(caughtError);
+      lifecycle.dispose();
       writeStreamDebug("stream_error", {
         attempt,
         message: error instanceof Error ? error.message : String(error),
@@ -375,6 +416,7 @@ export async function* streamMessage(
           type: "error",
           error: error instanceof Error ? error : new Error(String(error)),
           category: "aborted",
+          outputStarted: hasYieldedContent,
         };
         return errorStreamResult();
       }
@@ -411,8 +453,11 @@ export async function* streamMessage(
         type: "error",
         error: toFriendlyError(error, model),
         category: classifyAPIError(error),
+        outputStarted: hasYieldedContent,
       };
       return errorStreamResult();
+    } finally {
+      lifecycle.dispose();
     }
   }
 }
@@ -434,7 +479,7 @@ function errorStreamResult(): StreamResult {
  * we don't need incremental output.
  */
 export async function createMessage(
-  params: Omit<StreamRequestParams, "signal">,
+  params: StreamRequestParams,
 ): Promise<{ content: ContentBlock[]; usage: Usage; stopReason: string }> {
   const profile = await resolveProfile(params.model ?? DEFAULT_MODEL);
 
@@ -442,8 +487,11 @@ export async function createMessage(
   // the translated provider stream into a single result, with the same
   // transient-failure resilience as the Anthropic branch below.
   if (profile.protocol !== "anthropic") {
-    return await callWithRetry(() => collectViaProvider(profile, params), {
+    return await callWithRetry((_attempt, signal) =>
+      collectViaProvider(profile, { ...params, signal }), {
       querySource: params.querySource ?? "background",
+      signal: params.signal,
+      timeoutMs: params.timeoutMs,
       onRetry: ({ attempt, delayMs, category }) =>
         writeStreamDebug("createMessage_retry", { attempt, delayMs, category }),
     });
@@ -458,7 +506,7 @@ export async function createMessage(
   // background work — nobody is blocking on the result — so a 529 capacity
   // overload bails fast instead of amplifying load.
   const response = await callWithRetry(
-    () =>
+    (_attempt, signal) =>
       client.messages.create({
         model,
         max_tokens: maxTokens,
@@ -466,9 +514,11 @@ export async function createMessage(
         ...(params.system && { system: params.system }),
         ...(params.tools && params.tools.length > 0 && { tools: params.tools }),
         ...(params.toolChoice && { tool_choice: params.toolChoice }),
-      }),
+      }, { signal }),
     {
       querySource: params.querySource ?? "background",
+      signal: params.signal,
+      timeoutMs: params.timeoutMs,
       onRetry: ({ attempt, delayMs, category }) =>
         writeStreamDebug("createMessage_retry", { attempt, delayMs, category }),
     },

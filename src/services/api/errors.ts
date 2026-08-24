@@ -19,6 +19,7 @@ import {
   APIConnectionTimeoutError,
   APIError,
 } from "@anthropic-ai/sdk";
+import { RequestTimeoutError } from "./requestLifecycle.js";
 
 // ─── Categories ────────────────────────────────────────────────────
 
@@ -154,6 +155,7 @@ export function classifyAPIError(error: unknown): APIErrorCategory {
   }
 
   if (
+    error instanceof RequestTimeoutError ||
     error instanceof APIConnectionTimeoutError ||
     (error instanceof APIConnectionError &&
       error.message.toLowerCase().includes("timeout"))

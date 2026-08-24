@@ -1,4 +1,4 @@
-# R1 Invariant-to-Evidence Matrix（PR-05 基线）
+# R1 Invariant-to-Evidence Matrix（PR-06 基线）
 
 | Invariant ID | R1 承诺 | 确定性命令 | 证据文件 |
 |---|---|---|---|
@@ -11,5 +11,10 @@
 | `retry.partial-output-no-replay` | 任一用户可见部分输出都禁止重放当前 Stream Attempt | `npm run test:resilience` | `src/scripts/smoke-resilience.ts` |
 | `provider.common-semantics` | OpenAI Chat/Responses 与 Gemini 的 Tool Use、Usage、Stop Reason 均归一到公共 StreamResult | `npm run test:providerstream` | `src/scripts/test-providerstream-characterization.ts`, `src/scripts/__golden__/providerstream-characterization.golden.txt` |
 | `provider.protocol-error-safe` | 非 SSE/协议错误映射为 provider_protocol，不回显 Provider Body | `npm run test:providerstream` | `src/scripts/test-providerstream-characterization.ts` |
+| `lifecycle.abort-no-new-action` | Query 取消后不再启动新的 Model、Compaction、Tool 或 Hook 业务动作 | `npm run test:recovery-lifecycle` | `src/scripts/test-recovery-lifecycle.ts` |
+| `lifecycle.timeout-bounded-cleanup` | 每个 Model attempt 有有界 deadline，父取消优先，timer/listener 在结束时释放 | `npm run test:recovery-lifecycle` | `src/scripts/test-recovery-lifecycle.ts`, `src/services/api/requestLifecycle.ts` |
+| `stream.partial-output-no-restart` | Partial Stream 后既不 replay API attempt，也不触发 Reactive Compact/restart | `npm run test:resilience && npm run test:recovery-lifecycle` | `src/scripts/smoke-resilience.ts`, `src/scripts/test-recovery-lifecycle.ts` |
+| `context.single-reactive-recovery` | Prompt-too-long 仅可在零输出时执行一次 Compact + Restart，重复溢出有界失败 | `npm run test:recovery-lifecycle` | `src/scripts/test-recovery-lifecycle.ts` |
+| `trace.single-terminal-event` | completed/blocking/max-turns、aborted、timeout/model-error 映射到唯一且匹配的 Query 终止事件 | `npm run test:trace && npm run test:recovery-lifecycle` | `src/scripts/test-trace.ts`, `src/scripts/test-recovery-lifecycle.ts` |
 
-统一门禁：`npm run verify:core`。本矩阵覆盖 PR-04 基础与 PR-05 可靠性承诺；PR-06～PR-08 新承诺必须增量加入，不用测试数量或覆盖率替代证据映射。
+统一门禁：`npm run verify:core`。本矩阵覆盖 PR-04 基础以及 PR-05、PR-06 可靠性承诺；PR-07～PR-08 新承诺必须增量加入，不用测试数量或覆盖率替代证据映射。

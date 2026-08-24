@@ -22,6 +22,7 @@ export {
   createQueryFailedPayload,
   createQueryFinishedPayload,
   createQueryStartedPayload,
+  getQueryTerminalEventType,
 } from "./queryLifecycle.js";
 export {
   createModelCompletedPayload,

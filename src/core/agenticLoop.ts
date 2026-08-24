@@ -66,6 +66,7 @@ const MAX_OUTPUT_TOKENS_RECOVERY_PROMPT =
 export type LoopTerminationReason =
   | "completed"
   | "aborted"
+  | "timeout"
   | "model_error"
   | "max_turns"
   | "blocking_limit";
@@ -199,6 +200,8 @@ export interface QueryParams {
   traceSink?: TraceSink;
   /** Narrow dependency seam for deterministic lifecycle verification. */
   streamMessageImpl?: typeof streamMessage;
+  /** Narrow deterministic-test seam for reactive compaction. */
+  compactMessagesImpl?: typeof compactMessages;
 }
 
 export interface RunToolsOptions {
@@ -326,6 +329,18 @@ interface RunOneToolReturn {
   permissionRequest?: PermissionRequest;
 }
 
+function abortedToolReturn(block: ToolUseBlock): RunOneToolReturn {
+  const toolInput = (block.input as Record<string, unknown>) ?? {};
+  return {
+    execution: {
+      toolUseId: block.id,
+      toolName: block.name,
+      toolInput,
+      result: { content: "Request aborted before tool execution.", isError: true },
+    },
+  };
+}
+
 /**
  * Run one tool_use block end-to-end: name lookup, permission check,
  * the actual `tool.call()`, and result truncation. Pure of any
@@ -342,6 +357,7 @@ async function runOneToolBlock(
   context: ToolContext,
   options: RunToolsOptions,
 ): Promise<RunOneToolReturn> {
+  if (context.abortSignal?.aborted) return abortedToolReturn(block);
   const toolInput = (block.input as Record<string, unknown>) ?? {};
   const tool = findToolByName(block.name);
   if (!tool) {
@@ -375,6 +391,8 @@ async function runOneToolBlock(
       cwd: context.cwd,
       signal: context.abortSignal,
     });
+
+    if (context.abortSignal?.aborted) return abortedToolReturn(block);
 
     if (preOutcome.blockingError) {
       emitTrace(
@@ -416,6 +434,8 @@ async function runOneToolBlock(
       messages: options.conversationMessages,
       model: options.model,
     });
+
+    if (context.abortSignal?.aborted) return abortedToolReturn(block);
     let permissionSource: "permission_engine" | "pre_tool_hook" = "permission_engine";
 
     // PreToolUse hook can override the rule-based decision (source's
@@ -556,6 +576,8 @@ async function runOneToolBlock(
       );
     }
 
+    if (context.abortSignal?.aborted) return abortedToolReturn(block);
+
     // Stamp the tool_use id onto the per-call context so tools that
     // need to publish out-of-band updates (currently just AgentTool's
     // sub-agent progress store) can correlate their events back to
@@ -578,6 +600,8 @@ async function runOneToolBlock(
       }
     }
 
+    if (context.abortSignal?.aborted) return abortedToolReturn(block);
+
     // Permission cleared (or never needed) — the tool is now executing.
     setToolStatus(block.id, "running");
     toolStartedAt = performance.now();
@@ -592,6 +616,24 @@ async function runOneToolBlock(
       ...rawResult,
       content: truncateToolResult(rawResult.content, tool.maxResultSizeChars),
     };
+
+    if (context.abortSignal?.aborted) {
+      emitTrace(
+        options.traceSink,
+        result.isError ? "tool.failed" : "tool.completed",
+        createToolFinishedPayload({
+          toolName: block.name,
+          toolUseId: block.id,
+          result,
+          durationMs: performance.now() - toolStartedAt,
+        }),
+        toolSpanId,
+      );
+      return {
+        execution: { toolUseId: block.id, toolName: block.name, toolInput, result },
+        ...(surfacedRequest ? { permissionRequest: surfacedRequest } : {}),
+      };
+    }
 
     // ─── Stage 22: PostToolUse hooks ─────────────────────────────────
     // Fire AFTER the tool executes. Two effects:
@@ -784,6 +826,12 @@ export async function* query(
     turnCount: 0,
     aborted: false,
   };
+  const abortedResult = (): AgenticLoopResult => ({
+    state: { ...state, aborted: true },
+    usage: totalUsage,
+    lastCallUsage,
+    reason: "aborted",
+  });
   const totalUsage: Usage = {
     input_tokens: 0,
     output_tokens: 0,
@@ -811,9 +859,8 @@ export async function* query(
 
   while (state.turnCount < maxTurns) {
     if (params.abortSignal?.aborted) {
-      const abortedState = { ...state, aborted: true };
       yield { type: "turn_complete", reason: "aborted", turnCount: state.turnCount };
-      return { state: abortedState, usage: totalUsage, lastCallUsage, reason: "aborted" };
+      return abortedResult();
     }
 
     const nextTurnCount = state.turnCount + 1;
@@ -874,7 +921,7 @@ export async function* query(
     let stopReason = "";
     // Stage 27: capture a surfaced stream error so the outer scope can decide
     // on a recovery path (reactive compact) instead of failing inline.
-    let streamError: { error: Error; category?: string } | undefined;
+    let streamError: { error: Error; category?: string; outputStarted: boolean } | undefined;
 
     while (true) {
       const { value, done } = await stream.next();
@@ -959,7 +1006,11 @@ export async function* query(
         case "error":
           // Capture and break; the post-stream block decides whether to
           // recover (reactive compact) or surface the error.
-          streamError = { error: value.error, category: value.category };
+          streamError = {
+            error: value.error,
+            category: value.category,
+            outputStarted: value.outputStarted === true,
+          };
           break;
       }
       if (streamError) break;
@@ -967,20 +1018,64 @@ export async function* query(
 
     // ─── Stage 27: stream error handling (reactive compact) ──────────
     if (streamError) {
+      if (params.abortSignal?.aborted || streamError.category === "aborted") {
+        emitTrace(
+          params.traceSink,
+          "model.failed",
+          createModelFailedPayload({
+            turnId: nextTurnCount,
+            error: streamError.error,
+            errorCategory: "aborted",
+            durationMs: performance.now() - requestStartedAt,
+          }),
+          requestSpanId,
+        );
+        yield { type: "turn_complete", reason: "aborted", turnCount: state.turnCount };
+        return abortedResult();
+      }
+
+      if (streamError.category === "api_timeout") {
+        emitTrace(
+          params.traceSink,
+          "model.failed",
+          createModelFailedPayload({
+            turnId: nextTurnCount,
+            error: streamError.error,
+            errorCategory: "api_timeout",
+            durationMs: performance.now() - requestStartedAt,
+          }),
+          requestSpanId,
+        );
+        yield { type: "turn_complete", reason: "timeout", turnCount: nextTurnCount };
+        return {
+          state: { ...state, turnCount: nextTurnCount },
+          usage: totalUsage,
+          lastCallUsage,
+          reason: "timeout",
+        };
+      }
+
       // Prompt-too-long → summarize the history once and retry the turn.
       // Guarded by hasAttemptedReactiveCompact so we never loop on it.
       if (
         streamError.category === "prompt_too_long" &&
+        !streamError.outputStarted &&
         !hasAttemptedReactiveCompact &&
         state.messages.length > 0
       ) {
         hasAttemptedReactiveCompact = true;
         try {
-          const compactResult = await compactMessages(state.messages, undefined, {
+          const compact = params.compactMessagesImpl ?? compactMessages;
+          const compactResult = await compact(state.messages, undefined, {
             systemPrompt: params.systemPrompt,
             model: params.model,
             force: true,
+            signal: params.abortSignal,
           });
+          if (params.abortSignal?.aborted) {
+            yield { type: "turn_complete", reason: "aborted", turnCount: state.turnCount };
+            return abortedResult();
+          }
           if (compactResult.didCompact) {
             state = {
               messages: [...compactResult.messages],
@@ -1003,6 +1098,11 @@ export async function* query(
         }
       }
 
+      if (params.abortSignal?.aborted) {
+        yield { type: "turn_complete", reason: "aborted", turnCount: state.turnCount };
+        return abortedResult();
+      }
+
       emitTrace(
         params.traceSink,
         "model.failed",
@@ -1022,6 +1122,11 @@ export async function* query(
         lastCallUsage,
         reason: "model_error",
       };
+    }
+
+    if (params.abortSignal?.aborted) {
+      yield { type: "turn_complete", reason: "aborted", turnCount: state.turnCount };
+      return abortedResult();
     }
 
     // ─── Stage 27: max_output_tokens two-phase recovery ──────────────
@@ -1104,6 +1209,11 @@ export async function* query(
       turnCount: state.turnCount,
     };
 
+    if (params.abortSignal?.aborted) {
+      yield { type: "turn_complete", reason: "aborted", turnCount: state.turnCount };
+      return abortedResult();
+    }
+
     if (stopReason !== "tool_use") {
       // ─── Stage 22: Stop hook ──────────────────────────────────────
       // Fire user-defined Stop hooks before the loop returns. A hook
@@ -1132,6 +1242,11 @@ export async function* query(
               cwd: params.toolContext.cwd,
               signal: params.abortSignal,
             });
+
+        if (params.abortSignal?.aborted) {
+          yield { type: "turn_complete", reason: "aborted", turnCount: state.turnCount };
+          return abortedResult();
+        }
 
         const continuationText =
           stopOutcome.blockingError || stopOutcome.additionalContext;

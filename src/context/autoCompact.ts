@@ -104,6 +104,7 @@ export async function autoCompactIfNeeded(
     usageAnchorIndex?: number;
     systemPrompt?: string;
     querySource?: string;
+    signal?: AbortSignal;
   },
 ): Promise<{ result: CompactionResult; didAutoCompact: boolean }> {
   const estimatedTokens = tokenCountWithEstimation(messages, options);
@@ -128,10 +129,12 @@ export async function autoCompactIfNeeded(
       systemPrompt: options.systemPrompt,
       model,
       force: true,
+      signal: options.signal,
     });
     consecutiveAutoCompactFailures = 0;
     return { result, didAutoCompact: result.didCompact };
   } catch (error) {
+    if (options.signal?.aborted) throw error;
     consecutiveAutoCompactFailures++;
     debugLog("autoCompact", "failure", {
       error: error instanceof Error ? error.message : String(error),

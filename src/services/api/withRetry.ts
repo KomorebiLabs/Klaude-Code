@@ -25,6 +25,7 @@ import {
   getRetryAfterMs,
   is529Error,
 } from "./errors.js";
+import { createRequestLifecycle } from "./requestLifecycle.js";
 
 /**
  * Where a query originated. Source keys a 13-entry whitelist
@@ -224,11 +225,12 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
  * notice while waiting — so it shares `decideRetry`/`sleep` directly instead.
  */
 export async function callWithRetry<T>(
-  operation: (attempt: number) => Promise<T>,
+  operation: (attempt: number, signal: AbortSignal) => Promise<T>,
   options: {
     maxRetries?: number;
     querySource?: QuerySource;
     signal?: AbortSignal;
+    timeoutMs?: number;
     maxTotalDelayMs?: number;
     onRetry?: (info: {
       attempt: number;
@@ -247,33 +249,42 @@ export async function callWithRetry<T>(
   // eslint-disable-next-line no-constant-condition
   while (true) {
     attempt++;
-    if (options.signal?.aborted) {
-      throw new Error("Request was aborted.");
-    }
+    const lifecycle = createRequestLifecycle({
+      parentSignal: options.signal,
+      timeoutMs: options.timeoutMs,
+    });
+    let operationError: unknown;
     try {
-      return await operation(attempt);
-    } catch (error) {
-      const decision = decideRetry(error, attempt, {
-        maxRetries,
-        querySource: options.querySource,
-        consecutive529,
-        maxTotalDelayMs: options.maxTotalDelayMs,
-        spentDelayMs,
-      });
-      consecutive529 = decision.consecutive529;
-      if (!decision.retry) {
-        throw error;
+      if (lifecycle.signal.aborted) {
+        throw lifecycle.signal.reason;
       }
-      options.onRetry?.({
-        attempt,
-        delayMs: decision.delayMs,
-        category: classifyAPIError(error),
-        reason: decision.reason,
-        spentDelayMs,
-        remainingDelayMs: decision.remainingDelayMs,
-      });
-      spentDelayMs += decision.delayMs;
-      await sleep(decision.delayMs, options.signal);
+      return await operation(attempt, lifecycle.signal);
+    } catch (error) {
+      operationError = lifecycle.normalizeError(error);
+    } finally {
+      lifecycle.dispose();
     }
+
+    const decision = decideRetry(operationError, attempt, {
+      maxRetries,
+      querySource: options.querySource,
+      consecutive529,
+      maxTotalDelayMs: options.maxTotalDelayMs,
+      spentDelayMs,
+    });
+    consecutive529 = decision.consecutive529;
+    if (!decision.retry) {
+      throw operationError;
+    }
+    options.onRetry?.({
+      attempt,
+      delayMs: decision.delayMs,
+      category: classifyAPIError(operationError),
+      reason: decision.reason,
+      spentDelayMs,
+      remainingDelayMs: decision.remainingDelayMs,
+    });
+    spentDelayMs += decision.delayMs;
+    await sleep(decision.delayMs, options.signal);
   }
 }
