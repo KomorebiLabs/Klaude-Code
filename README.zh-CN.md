@@ -49,7 +49,7 @@ Klaude-Code 当前包含两条相互连接、但性质不同的路线：
 
 当前实现已经包含终端 CLI、流式模型通信、本地工具、权限、Sandbox、会话、上下文管理、MCP、Skills、Sub-Agent、后台执行、Agent Teams、Hooks、多 Provider、多模态输入以及 Extended Thinking 控制等能力。
 
-第一条企业级 Harness 核心因果链已经完成：Trace 契约与脱敏、本地弹性 JSONL 存储，以及 Query、Model Attempt、API Retry、Stream Restart、Tool、Permission 的真实边界事件。最小 Inspector 可按 sequence 安全读取单份 Trace；Evaluation 门禁与更完整的可靠性、安全状态机仍属于后续加固。
+第一条企业级 Harness 核心因果链已经完成：Trace 契约与脱敏、本地弹性 JSONL 存储，以及 Query、Model Attempt、API Retry、Stream Restart、Tool、Permission 的真实边界事件。最小 Inspector 可按 sequence 安全读取单份 Trace；E6-A 已提供独立 Evaluation Artifact Store、证据矩阵和确定性 `verify:core` 门禁。更完整的可靠性与安全状态机仍属于后续加固。
 
 当前运行时仍然保留从原始实现继承而来的兼容标识，包括 npm package 名称 `easy-agent` 和可执行命令 `agent`。完整的 package、CLI、配置和用户数据迁移被有意放在后续 E9 兼容性项目中；本次 README 品牌重定位不声称这项迁移已经完成。
 
@@ -213,9 +213,9 @@ Task 1–5 已经建立本地结构化 Trace 核心因果链，并把现有模�
 - ✅ 脱敏敏感值，并让生命周期 payload 遵守内容最小化原则；
 - ✅ 通过带顺序控制、路径约束和失败隔离的 JSONL 读写落盘；
 - ✅ 记录 QueryEngine 的 `query.started`、`query.finished`、`query.failed` 和 `query.aborted`；
-- 🔧 记录模型请求、完成、失败、重试和流重启的元信息；
-- 🔧 通过安全摘要记录工具调用和权限决策；
-- 🔧 校验 schema 版本、sequence 单调性以及 query/span 关系；
+- ✅ 记录模型请求、完成、失败、重试和流重启的元信息；
+- ✅ 通过安全摘要记录工具调用和权限决策；
+- ✅ 校验 schema 版本、sequence 单调性以及 query/span 关系；
 - 🔧 在顶层 query 和嵌套运行时 span 之间保持统一的 `traceId`；
 - 📋 增加 Trace 检查/导出 CLI 和诊断包格式；
 - 📋 定义 Trace schema 迁移和保留规则。
@@ -312,17 +312,17 @@ Sub-Agent、后台执行、Agent Teams 和 Worktree 隔离已经提供并行执�
 
 ### E6 —— Evaluation、Benchmark 与质量门禁
 
-**状态：** Foundation: absent · Klaude hardening: not-started
+**状态：** Foundation: present · Klaude hardening: in-progress
 
 E6 使用独立 Evaluation Run Record 与 Artifact Store 判断受控任务是否满足成功标准，不把隐私最小化 Runtime Trace 扩张成完整会话采集。E6-A 骨架在 E1 后提前建立，E6-B 在 E2/E3 后关闭 R1 证据闭环。
 
 任务：
 
-- 定义 Task、Trial、Grader、Evaluation Result 的窄契约；
-- 建立 R1 Claim/Invariant-to-Evidence Matrix；
-- 校验 Trace 生命周期、隐私、Permission Deny 和 Writer Failure Isolation；
-- 输出机器可读结果和 Markdown 报告；
-- 只将确定性 Fake Provider/fixture 检查接入 Core CI；
+- ✅ 定义 Task、Trial、Grader、Evaluation Result 的窄契约；
+- ✅ 建立 R1 Claim/Invariant-to-Evidence Matrix 基线；
+- ✅ 校验 Trace 生命周期、隐私、Permission Deny 和 Writer Failure Isolation；
+- ✅ 输出机器可读结果和 Markdown 报告；
+- ✅ 只将确定性 Fake Provider/fixture 检查接入 Core CI；
 - 将真实模型实验与 CI 分离，并按 Trial 如实报告；
 - 不声称生产 Trace 可以重放原始模型行为。
 
@@ -392,7 +392,7 @@ Enterprise Harness Track
   E3 安全           Foundation: inherited · Klaude hardening: not-started
   E4 上下文/记忆    Foundation: inherited · Klaude hardening: deferred
   E5 多 Agent       Foundation: inherited · Klaude hardening: deferred
-  E6 Evaluation     Foundation: absent    · Klaude hardening: not-started
+  E6 Evaluation     Foundation: present   · Klaude hardening: in-progress
   E7 扩展           Foundation: inherited · Klaude hardening: deferred
   E8 诊断           Foundation: inherited · Klaude hardening: deferred
   E9 发布           Foundation: inherited · Klaude hardening: deferred

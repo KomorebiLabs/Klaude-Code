@@ -173,10 +173,9 @@ status: historical-reference
 
 ## 当前状态
 
-- Task 1–3 Trace foundation：已有实现与聚焦证据。
-- PR-00 / R0 Roadmap Repair：当前执行阶段。
-- PR-01 / R1-A Trace Storage & Availability Contract：PR-00 完成后的唯一下一候选。
-- E6-A Evaluation Foundation 在 E1 核心 Trace 后启动，不再等待 E4/E5。
+- PR-00～PR-03：路线修复、Trace Storage、Model/Retry/Stream、Tool/Permission 与 Inspector 已合并。
+- PR-04 / R1-D E6-A Evaluation Foundation：当前阶段，提供独立 Artifact Store、证据矩阵与确定性 Core Gate。
+- 下一候选是 PR-05 / R1-E Error Taxonomy / Retry / Provider；未经单独授权不得启动。
 - 既有文档的历史归属暂不在本文件更新中强制调整；后续新增文档必须遵守本规则。
 
 > [!warning] 维护底线
