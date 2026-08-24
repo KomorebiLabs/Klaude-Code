@@ -36,9 +36,23 @@ export interface TraceMetadata {
   sessionId?: string;
 }
 
+export type TraceAvailabilityState = "active" | "disabled" | "degraded";
+export type TraceDegradedReason =
+  | "explicitly_disabled"
+  | "initialization_failed"
+  | "write_failed"
+  | "close_timeout";
+
+export interface TraceStatus {
+  state: TraceAvailabilityState;
+  reason?: TraceDegradedReason;
+  droppedEvents: number;
+}
+
 export interface TraceSink {
   emit(eventType: HarnessTraceEventType, payload: Record<string, unknown>, options?: { spanId?: string }): void;
   close(): Promise<void>;
+  getStatus(): Readonly<TraceStatus>;
 }
 
 export interface ToolInputSummary {

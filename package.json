@@ -11,6 +11,7 @@
     "dev": "tsx src/entrypoint/cli.ts",
     "build": "tsc",
     "start": "node dist/entrypoint/cli.js",
+    "test:trace": "tsx src/scripts/test-trace.ts",
     "test:queryengine": "tsx src/scripts/test-queryengine-characterization.ts",
     "test:providerstream": "tsx src/scripts/test-providerstream-characterization.ts",
     "test:notices": "tsx src/scripts/test-useagentsession-notices.ts",

@@ -4,11 +4,19 @@ export {
   type HarnessTraceEventType,
   type TraceMetadata,
   type TraceSink,
+  type TraceStatus,
   type ToolInputSummary,
   type ToolResultSummary,
 } from "./types.js";
 export { createSafeMessage, redactForTrace, summarizeToolInput, summarizeToolResult } from "./redaction.js";
-export { createTraceWriter } from "./traceWriter.js";
+export { createTraceWriter, type TraceWriterOptions } from "./traceWriter.js";
+export {
+  applyTraceRetentionPolicy,
+  DEFAULT_TRACE_QUOTA_BYTES,
+  DEFAULT_TRACE_RETENTION_DAYS,
+  type TraceRetentionOptions,
+  type TraceRetentionResult,
+} from "./traceStoragePolicy.js";
 export {
   createQueryAbortedPayload,
   createQueryFailedPayload,

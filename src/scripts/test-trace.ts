@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
+import * as os from "node:os";
 import * as path from "node:path";
 import {
   createSafeMessage,
   createTraceWriter,
+  applyTraceRetentionPolicy,
   createQueryAbortedPayload,
   createQueryFailedPayload,
   createQueryFinishedPayload,
@@ -125,7 +127,7 @@ assert.equal(failedPayload.errorCategory, "Error");
 const abortedPayload = createQueryAbortedPayload();
 assert.deepEqual(abortedPayload, { reason: "abort_signal" });
 
-const storageRoot = await fs.mkdtemp(path.join(process.cwd(), ".trace-test-"));
+const storageRoot = await fs.mkdtemp(path.join(os.tmpdir(), "easy-agent-trace-test-"));
 const traceCwd = path.join(storageRoot, "project");
 await fs.mkdir(traceCwd, { recursive: true });
 const traceId = "trace-test";
@@ -143,16 +145,81 @@ assert.equal((await fs.readFile(tracePath, "utf8")).trim().split("\n").length, 2
 const events = await readTraceEvents(tracePath);
 assert.deepEqual(events.map((event) => event.eventType), ["query.started", "query.finished"]);
 
+for (const terminalEvent of ["query.failed", "query.aborted"] as const) {
+  const terminalTraceId = `trace-${terminalEvent.replace(".", "-")}`;
+  const terminalWriter = await createTraceWriter(traceCwd, terminalTraceId);
+  terminalWriter.emit("query.started", { content: "password=hunter2" });
+  terminalWriter.emit(terminalEvent, { reason: terminalEvent });
+  await terminalWriter.close();
+  const terminalEvents = await readTraceEvents(await getTracePath(traceCwd, terminalTraceId));
+  assert.deepEqual(terminalEvents.map((event) => event.eventType), ["query.started", terminalEvent]);
+  assert.equal(JSON.stringify(terminalEvents).includes("hunter2"), false);
+}
+
 await fs.appendFile(tracePath, '{"schemaVersion":1,"eventType":"truncated"\n', "utf8");
+assert.equal((await readTraceEvents(tracePath)).length, 2);
+await fs.appendFile(
+  tracePath,
+  `${JSON.stringify({
+    schemaVersion: 2,
+    eventId: "future-event",
+    traceId,
+    sequence: 3,
+    timestamp: new Date().toISOString(),
+    eventType: "query.finished",
+    payload: {},
+  })}\n`,
+  "utf8",
+);
 assert.equal((await readTraceEvents(tracePath)).length, 2);
 
 configureSessionPersistence(false);
-const disabledTraceId = "trace-disabled";
-const disabledWriter = await createTraceWriter(traceCwd, disabledTraceId);
+const independentTraceId = "trace-session-independent";
+const independentWriter = await createTraceWriter(traceCwd, independentTraceId);
+independentWriter.emit("query.started", {});
+await independentWriter.close();
+await assert.doesNotReject(fs.access(await getTracePath(traceCwd, independentTraceId)));
+assert.equal(independentWriter.getStatus().state, "active");
+configureSessionPersistence(true);
+
+const disabledTraceId = "trace-explicitly-disabled";
+const disabledWriter = await createTraceWriter(traceCwd, disabledTraceId, { enabled: false });
 disabledWriter.emit("query.started", {});
 await disabledWriter.close();
+assert.deepEqual(disabledWriter.getStatus(), {
+  state: "disabled",
+  reason: "explicitly_disabled",
+  droppedEvents: 0,
+});
 await assert.rejects(fs.access(await getTracePath(traceCwd, disabledTraceId)));
-configureSessionPersistence(true);
+
+const hangingWriter = await createTraceWriter(traceCwd, "trace-close-timeout", {
+  closeTimeoutMs: 20,
+  appendFile: async () => new Promise<void>(() => {}),
+});
+hangingWriter.emit("query.started", {});
+const closeStartedAt = Date.now();
+await hangingWriter.close();
+assert.ok(Date.now() - closeStartedAt < 250);
+assert.deepEqual(hangingWriter.getStatus(), {
+  state: "degraded",
+  reason: "close_timeout",
+  droppedEvents: 1,
+});
+
+const writeFailureWriter = await createTraceWriter(traceCwd, "trace-write-failure", {
+  appendFile: async () => {
+    throw new Error("password=hunter2");
+  },
+});
+writeFailureWriter.emit("query.started", {});
+await writeFailureWriter.close();
+assert.deepEqual(writeFailureWriter.getStatus(), {
+  state: "degraded",
+  reason: "write_failed",
+  droppedEvents: 1,
+});
+assert.equal(JSON.stringify(writeFailureWriter.getStatus()).includes("hunter2"), false);
 
 const failingCwd = path.join(storageRoot, "failing-project");
 const failingWriter = await createTraceWriter(failingCwd, "trace-failure");
@@ -161,5 +228,51 @@ await fs.rm(path.dirname(failingTracePath), { recursive: true, force: true });
 assert.doesNotThrow(() => failingWriter.emit("query.started", { apiKey: "secret" }));
 await assert.doesNotReject(() => failingWriter.close());
 
+const retentionCwd = path.join(storageRoot, "retention-project");
+const retainedTracePath = await getTracePath(retentionCwd, "retained");
+const traceDir = path.dirname(retainedTracePath);
+await fs.mkdir(traceDir, { recursive: true });
+const oldPath = path.join(traceDir, "old.jsonl");
+const quotaOldestPath = path.join(traceDir, "quota-oldest.jsonl");
+const newestPath = path.join(traceDir, "newest.jsonl");
+const outsidePath = path.join(path.dirname(traceDir), "outside.jsonl");
+await fs.writeFile(oldPath, "old");
+await fs.writeFile(quotaOldestPath, "a".repeat(20));
+await fs.writeFile(newestPath, "b".repeat(20));
+await fs.writeFile(outsidePath, "outside");
+const nowMs = Date.now();
+await fs.utimes(oldPath, new Date(nowMs - 20 * 24 * 60 * 60 * 1000), new Date(nowMs - 20 * 24 * 60 * 60 * 1000));
+await fs.utimes(quotaOldestPath, new Date(nowMs - 2_000), new Date(nowMs - 2_000));
+await fs.utimes(newestPath, new Date(nowMs - 1_000), new Date(nowMs - 1_000));
+const retention = await applyTraceRetentionPolicy(retentionCwd, {
+  maxAgeDays: 10,
+  maxBytes: 25,
+  nowMs,
+});
+assert.equal(retention.deletedByAge, 1);
+assert.equal(retention.deletedByQuota, 1);
+assert.equal(retention.failures, 0);
+await assert.rejects(fs.access(oldPath));
+await assert.rejects(fs.access(quotaOldestPath));
+await assert.doesNotReject(fs.access(newestPath));
+await assert.doesNotReject(fs.access(outsidePath));
+
+const unsafeCwd = path.join(storageRoot, "unsafe-retention-project");
+const unsafeTracePath = await getTracePath(unsafeCwd, "unsafe");
+const unsafeTraceDir = path.dirname(unsafeTracePath);
+const externalTraceDir = path.join(storageRoot, "external-traces");
+await fs.mkdir(path.dirname(unsafeTraceDir), { recursive: true });
+await fs.mkdir(externalTraceDir, { recursive: true });
+await fs.writeFile(path.join(externalTraceDir, "must-survive.jsonl"), "external");
+try {
+  await fs.symlink(externalTraceDir, unsafeTraceDir, process.platform === "win32" ? "junction" : "dir");
+  const unsafeRetention = await applyTraceRetentionPolicy(unsafeCwd, { maxAgeDays: 0, maxBytes: 0 });
+  assert.equal(unsafeRetention.skippedUnsafeRoot, true);
+  await assert.doesNotReject(fs.access(path.join(externalTraceDir, "must-survive.jsonl")));
+} catch (error: unknown) {
+  const code = (error as NodeJS.ErrnoException)?.code;
+  if (code !== "EPERM" && code !== "EACCES") throw error;
+}
+
 await fs.rm(storageRoot, { recursive: true, force: true });
-console.log("trace DTO/redaction/storage tests passed");
+console.log("trace DTO/redaction/storage/retention tests passed");
