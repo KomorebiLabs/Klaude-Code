@@ -357,4 +357,4 @@ R2 证据稳定后：PR-15 / PR-16 → PR-17
 
 ## 9. 当前下一步
 
-PR-00～PR-08 已合并，PR-09 / R1-I 已完成实现并等待审查与合并。PR-09 合并后 Resume Release R1 标记为 evidenced；下一阶段必须由维护者从 **PR-10 / E4-A Context Provenance & Budget**、**PR-12 / E5-A Multi-Agent Contract & Worktree Baseline**、**PR-14 / E8 Developer Diagnostics** 中选择一个并单独授权，不能自动启动。
+PR-00～PR-09 已合并，Resume Release R1 已标记为 evidenced。当前授权阶段为 **PR-14 / E8 Developer Diagnostics**；它合并后唯一建议下一候选为 **PR-10 / E4-A Context Provenance & Budget**，仍须维护者单独授权，不能自动启动。

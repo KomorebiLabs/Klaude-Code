@@ -277,7 +277,7 @@ docs/
 
 ### E4 —— 上下文、记忆与成本治理
 
-**状态：** Foundation: inherited · Klaude hardening: deferred
+**状态：** R2 Diagnostics v1: present · Context/Memory/Multi-Agent explanations: deferred
 
 上下文加载、Compaction、Memory、项目指令、会话历史和 Token Budget 已经存在。E4 让它们的信息流和成本行为变得可解释、可测试。
 
@@ -354,12 +354,22 @@ E8 将内部证据转化为能够帮助开发者理解和恢复运行的反馈�
 任务：
 
 - 📋 解释配置来源、优先级和最终生效设置；
-- 📋 扩展 `/doctor` 对 Provider、权限、Sandbox、MCP、Session 和依赖的覆盖；
-- 📋 提供易于理解的 retry、permission、compaction 和 recovery 反馈；
+- ✅ 扩展 `/doctor`，聚合环境检查、最新安全 Trace 摘要与 Evaluation 结果；
+- ✅ 提供 retry、stream restart、permission、tool、query failure 和 recovery guidance；
 - 📋 提供 session resume 和失败恢复指引；
-- 📋 增加 Trace 摘要、执行时间线、usage/cost 检查和失败包；
-- 📋 让诊断输出可以安全分享，不暴露 prompt、secret 或文件内容；
+- ✅ 增加 Trace 生命周期摘要和文本/JSON 安全诊断报告；
+- ✅ 让诊断输出可以安全分享，不暴露 prompt、secret、绝对项目路径或文件内容；
+- 📋 在 PR-10～PR-13 证据建立后增加 Context/Memory/Sub-Agent 与 usage/cost 解释；
 - 🔬 基于反复出现且有证据支持的失败模式，研究主动诊断。
+
+交互会话中运行 `/doctor` 可同时查看环境健康与当前项目的最新安全证据摘要；开发者也可以在仓库中生成同源的文本或 JSON 报告：
+
+```bash
+npm run diagnose
+npm run diagnose -- --json
+```
+
+报告只包含状态、计数、稳定分类、证据引用和恢复建议，不输出 Prompt、模型/Tool 正文、命令、环境变量值或绝对项目路径。
 
 ### E9 —— 打包、兼容性与运行准备
 
@@ -395,7 +405,7 @@ Enterprise Harness Track
   E5 多 Agent       Foundation: inherited · Klaude hardening: deferred
   E6 Evaluation     Foundation: present   · R1 evidenced
   E7 扩展           Foundation: inherited · Klaude hardening: deferred
-  E8 诊断           Foundation: inherited · Klaude hardening: deferred
+  E8 诊断           Foundation: inherited · R2 Diagnostics v1 present
   E9 发布           Foundation: inherited · Klaude hardening: deferred
 ```
 

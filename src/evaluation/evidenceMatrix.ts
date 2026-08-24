@@ -32,3 +32,10 @@ export const R1_CORE_EVIDENCE_MATRIX: EvidenceMatrixEntry[] = [
   { invariantId: "diagnostics.fake-secret-absent", claim: "Known secret forms are absent from diagnostics artifacts", command: "npm run test:external-safety && npm run test:trace && npm run test:evaluation", evidenceFile: "src/scripts/test-external-safety-contract.ts, src/observability/redaction.ts" },
   { invariantId: "external.trace-allowlist", claim: "External execution trace records allowlisted structure only", command: "npm run test:external-safety && npm run test:trace", evidenceFile: "src/scripts/test-external-safety-contract.ts, src/observability/toolLifecycle.ts" },
 ];
+
+/** Post-R1 evidence grows independently so the frozen 25-item R1 release remains reproducible. */
+export const POST_R1_EVIDENCE_MATRIX: EvidenceMatrixEntry[] = [
+  { invariantId: "diagnostics.failure-explanation", claim: "Trace evidence explains retry, restart, permission, tool, and query outcomes with bounded recovery guidance", command: "npm run test:diagnostics", evidenceFile: "src/scripts/test-diagnostics.ts, src/diagnostics/traceAnalysis.ts" },
+  { invariantId: "diagnostics.artifact-failure-isolation", claim: "Missing, malformed, truncated, or linked artifacts cannot break Doctor or diagnostic report generation", command: "npm run test:diagnostics", evidenceFile: "src/scripts/test-diagnostics.ts, src/diagnostics/artifactReader.ts" },
+  { invariantId: "diagnostics.safe-share-output", claim: "Text and JSON diagnostics omit raw payloads, fake secrets, and absolute project paths", command: "npm run test:diagnostics", evidenceFile: "src/scripts/test-diagnostics.ts, src/diagnostics/render.ts" },
+];
