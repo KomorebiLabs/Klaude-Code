@@ -51,7 +51,7 @@ Klaude-Code 当前包含两条相互连接、但性质不同的路线：
 
 第一条企业级 Harness 纵向链路已经闭合：Trace 契约与脱敏、本地弹性 JSONL 存储，Query、Model Attempt、API Retry、Stream Restart、Tool、Permission 的真实边界事件，以及 Retry/Abort/Recovery、Tool/Permission、文件/进程/MCP 外部安全契约。E6 以独立 Artifact Store、25 项 R1 证据矩阵和受控端到端 Trial 提供确定性 `verify:core` 门禁。其后又完成 Developer Diagnostics、Context Provenance、预算估算、Compaction 保真与 Memory 生命周期治理。R1 和 Post-R1 证据只代表登记的不变量有证据，不代表真实模型成功率或完整企业产品交付。
 
-> **近期维护状态：** 本轮集中开发已经封箱，当前没有正在执行或默认授权的下一 Stage。项目并未废弃，未来会继续推进；近期只处理必要的安全、构建、兼容和文档事实问题。完整快照、剩余边界和重启方式见 [`docs/PROJECT-SNAPSHOT.md`](./docs/PROJECT-SNAPSHOT.md)；客观问题清单、改进方案和未来探索见 [`Future.md`](./Future.md)。
+> **近期维护状态：** 本轮集中开发已经封箱，当前没有正在执行或默认授权的下一 Stage。项目并未废弃，未来会继续推进；近期只处理必要的安全、构建、兼容和文档事实问题。完整快照、剩余边界和重启方式见 [`docs/PROJECT-SNAPSHOT.md`](./docs/PROJECT-SNAPSHOT.md)；客观问题清单见 [`Future.md`](./Future.md)，可直接拆分执行的未来工作包见 [`Future Doing.md`](./Future%20Doing.md)。
 
 当前运行时仍然保留从原始实现继承而来的兼容标识，包括 npm package 名称 `easy-agent` 和可执行命令 `agent`。完整的 package、CLI、配置和用户数据迁移被有意放在后续 E9 兼容性项目中；本次 README 品牌重定位不声称这项迁移已经完成。
 
@@ -521,7 +521,7 @@ agent --dump-system-prompt
 4. 项目近期进入维护暂停，不主动启动 PR-12、PR-13 或 R3 工作；
 5. 未来恢复时优先重新评估 PR-12 Multi-Agent Contract，再考虑 PR-13 Recovery、PR-15 Extensions、PR-16 External Benchmark 和 PR-17 Packaging/Release。
 
-封箱状态、诚实限制、维护规则和重启协议统一记录在 [`docs/PROJECT-SNAPSHOT.md`](./docs/PROJECT-SNAPSHOT.md)。路线仍然有效，但任何后续 Stage 都必须重新授权并编写新的 JIT Plan。更完整的现存问题、优先级和未来路线见 [`Future.md`](./Future.md)。
+封箱状态、诚实限制、维护规则和重启协议统一记录在 [`docs/PROJECT-SNAPSHOT.md`](./docs/PROJECT-SNAPSHOT.md)。路线仍然有效，但任何后续 Stage 都必须重新授权并编写新的 JIT Plan。更完整的现存问题、优先级和未来路线见 [`Future.md`](./Future.md)；未来工作包和操作清单见 [`Future Doing.md`](./Future%20Doing.md)，它们不会自动授权开发。
 
 ## 贡献策略
 

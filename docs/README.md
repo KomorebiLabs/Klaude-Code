@@ -15,7 +15,7 @@ status: active
 # Klaude-Code Docs
 
 > [!important] 当前执行状态
-> 本轮集中开发已封箱，当前没有活动或默认授权的下一 Stage。先阅读[近期封箱快照](./PROJECT-SNAPSHOT.md)和根目录[未来路线说明](../Future.md)；只有用户重新授权后，才进入 `MainTask.md` 和阶段计划选择新的 JIT 开发窗口。
+> 本轮集中开发已封箱，当前没有活动或默认授权的下一 Stage。先阅读[近期封箱快照](./PROJECT-SNAPSHOT.md)、根目录[未来路线说明](../Future.md)和[未来执行工作包](../Future%20Doing.md)；只有用户重新授权后，才进入 `MainTask.md` 和阶段计划选择新的 JIT 开发窗口。
 
 > [!abstract] 文档管理原则
 > 文档按照**面向谁、处于什么阶段、是否仍然有效**来组织，而不是按照复杂的技术名词层层拆分。`docs/README.md` 是唯一入口；新增文档前先判断它的读者和生命周期。

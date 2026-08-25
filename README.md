@@ -51,7 +51,7 @@ The current implementation already includes a terminal CLI, streaming model comm
 
 The completed Enterprise Harness slices now cover privacy-aware Trace storage and Query/Model/Retry/Stream/Tool/Permission causality, deterministic Evaluation, runtime reliability and recovery, permission and external-execution safety, Developer Diagnostics, Context Provenance, compaction invariant retention, and versioned Memory lifecycle governance. These claims are bounded by deterministic evidence; they do not imply large-scale production use or complete model-quality benchmarking.
 
-> **Maintenance status:** the current concentrated development cycle is sealed and there is no active or implicitly authorized next stage. The project is not abandoned; near-term changes are limited to necessary security, build, compatibility, and documentation corrections. See the [project snapshot](./docs/PROJECT-SNAPSHOT.md) for exact scope, limitations, deferred work, and the restart protocol; see [`Future.md`](./Future.md) for the objective long-term problem list and candidate directions.
+> **Maintenance status:** the current concentrated development cycle is sealed and there is no active or implicitly authorized next stage. The project is not abandoned; near-term changes are limited to necessary security, build, compatibility, and documentation corrections. See the [project snapshot](./docs/PROJECT-SNAPSHOT.md) for exact scope, limitations, deferred work, and the restart protocol; see [`Future.md`](./Future.md) for the objective long-term problem list and [`Future Doing.md`](./Future%20Doing.md) for executable future work packages.
 
 The runtime still contains compatibility identifiers inherited from the original implementation, including the npm package name `easy-agent` and the executable name `agent`. A complete package, CLI, configuration, and user-data migration is intentionally tracked as a later E9 compatibility project; this README repositioning does not claim that migration is complete.
 
@@ -482,7 +482,7 @@ agent --dump-system-prompt
 
 ## Sealed Snapshot and Future Work
 
-The project has completed PR-00 through PR-11 plus PR-14: 13 of the 18 staged roadmap items (about 72%). This is roadmap execution progress, not product completeness. There is no active near-term feature stage. [`Future.md`](./Future.md) records the remaining problems, improvement options, priorities, and restart rules.
+The project has completed PR-00 through PR-11 plus PR-14: 13 of the 18 staged roadmap items (about 72%). This is roadmap execution progress, not product completeness. There is no active near-term feature stage. [`Future.md`](./Future.md) records the remaining problems and priorities; [`Future Doing.md`](./Future%20Doing.md) contains copy-ready future work packages, but does not authorize execution.
 
 When development resumes, PR-12 Multi-Agent Contract is the first candidate, followed by PR-13 Recovery, PR-15 Extension Governance, PR-16 External Benchmark, and PR-17 Packaging/Release. Each remains deferred until explicitly authorized with a fresh implementation plan. See the [project snapshot](./docs/PROJECT-SNAPSHOT.md).
 
